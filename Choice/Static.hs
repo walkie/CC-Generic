@@ -68,17 +68,33 @@ wellDim = well []
           | otherwise            = False
         well m e                 = all (well m) (children e)
 
+-- is the expression dimension free?
+dimFree :: Expr t a -> Bool
+dimFree (Dim _ _) = False
+dimFree e         = all dimFree (children e)
+
+-- is the expression choice free?
+choiceFree :: Expr t a -> Bool
+choiceFree (_ :? _) = False
+choiceFree e        = all choiceFree (children e)
+
+-- is the expression binding free?
+bindFree :: Expr t a -> Bool
+bindFree (Let _ _) = False
+bindFree e         = all bindFree (children e)
+
+-- is the expression reference free?
+refFree :: Expr t a -> Bool
+refFree (Var _) = False
+refFree e       = all refFree (children e)
+
 -- is the expression variation free?
 varFree :: Expr t a -> Bool
-varFree (Dim _ _) = False
-varFree (_ :? _)  = False
-varFree e         = all varFree (children e)
+varFree e = dimFree e && choiceFree e
 
 -- is the expression sharing free?
 shareFree :: Expr t a -> Bool
-shareFree (Let _ _) = False
-shareFree (Var _)   = False
-shareFree e         = all shareFree (children e)
+shareFree e = bindFree e && refFree e
 
 -- is the expression plain?
 plain :: Expr t a -> Bool
