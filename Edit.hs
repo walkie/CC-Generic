@@ -4,33 +4,37 @@ module Edit where
 
 import Choice
 
-type Path t a = [Step t a] 
+type Path = [Step] 
 
-data Step t a = S Int   -- structure subIx
-              | B Bool  -- binding   inBody?
-              | D       -- dimDecl
-              | C Int   -- choice    subIx
-              deriving (Eq,Show)
+data Step = S Int   -- structure subIx
+          | B Bool  -- binding   inBody?
+          | D       -- dimDecl
+          | C Int   -- choice    subIx
+          deriving (Eq,Show)
 
-data Command t a = Command (Path t a) (Edit t a)
+data Command t a = Command Path (Edit t a)
 
 -- TODO this could be refactored...
-data Edit t a = SData      a
+data Edit t a = SNew       a
+              | SData      a
               | SInsert    Int (Expr t a)
               | SDelete    Int
+              | BNew       Name
               | BRename    Name
               | BBound     (Expr t a)
               | BBody      (Expr t a)
               | VRename    Name
+              | DNew       Name
               | DRename    Name
               | DTagInsert Int t
               | DTagDelete Int
               | DBody      (Expr t a)
+              | CNew       Name
               | CRename    Name
               | CInsert    Int (Expr t a)
               | CDelete    Int
 
-follow :: Path t a -> Expr t a -> Match t a
+follow :: Path -> Expr t a -> Match t a
 follow = f id
   where
     f c [] e = Just (c,e)
@@ -42,17 +46,21 @@ follow = f id
     f _ _ _ = Nothing
 
 edit :: Edit t a -> Expr t a -> Maybe (Expr t a)
+edit (SNew       a  ) e               = Just $ a :< [e]
 edit (SData      a  ) (_ :< es)       = Just $ a :< es
 edit (SInsert    i e) (a :< es)       = Just $ a :< insert i es e
 edit (SDelete    i  ) (a :< es)       = Just $ a :< delete i es
+edit (BNew       v  ) e               = Just $ Let (v:=e) (Var v)
 edit (BRename    v  ) (Let (_:=e) e') = Just $ Let (v:=e) e'
 edit (BBound     e  ) (Let (v:=_) e') = Just $ Let (v:=e) e'
 edit (BBody      e' ) (Let (v:=e) _ ) = Just $ Let (v:=e) e'
 edit (VRename    v  ) (Var _)         = Just $ Var v
+edit (DNew       d  ) e               = Just $ Dim (d:=[]) e
 edit (DRename    d  ) (Dim (_:=ts) e) = Just $ Dim (d:=ts) e
 edit (DTagInsert i t) (Dim (d:=ts) e) = Just $ Dim (d:=insert i ts t) e
 edit (DTagDelete i  ) (Dim (d:=ts) e) = Just $ Dim (d:=delete i ts  ) e
 edit (DBody      e  ) (Dim (d:=ts) _) = Just $ Dim (d:=ts) e
+edit (CNew       d  ) e               = Just $ d :? [e]
 edit (CRename    d  ) (_ :? es)       = Just $ d :? es
 edit (CInsert    i e) (d :? es)       = Just $ d :? insert i es e
 edit (CDelete    i  ) (d :? es)       = Just $ d :? delete i es
@@ -70,11 +78,11 @@ exec cs e = foldMaybe exec' (Just e) cs
 -- Smart Constructors --
 ------------------------
 
-cmds :: Path t a -> [Edit t a] -> [Command t a]
+cmds :: Path -> [Edit t a] -> [Command t a]
 cmds = map . Command
 
-sReplace :: Path t a -> Int -> Expr t a -> [Command t a]
+sReplace :: Path -> Int -> Expr t a -> [Command t a]
 sReplace p i e = cmds p [SDelete i, SInsert i e]
 
-dTagReplace :: Path t a -> Int -> t -> [Command t a]
+dTagReplace :: Path -> Int -> t -> [Command t a]
 dTagReplace p i t = cmds p [DTagDelete i, DTagInsert i t]
