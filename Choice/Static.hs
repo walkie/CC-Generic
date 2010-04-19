@@ -4,6 +4,7 @@ module Choice.Static where
 import Data.List     (concatMap,delete,nub)
 
 import Choice.Syntax
+import Choice.Util hiding (delete)
 
 -----------
 -- Types --
@@ -28,8 +29,6 @@ type Decision t = [QTag t]
 
 dom = map fst
 rng = map snd
-
-union = nub . concat
 
 
 ---------------------------

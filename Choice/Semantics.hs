@@ -3,10 +3,11 @@
 module Choice.Semantics where
 
 import Data.List  (elemIndex,nub)
-import Data.Maybe (catMaybes,fromMaybe,listToMaybe)
+import Data.Maybe (fromMaybe)
 
 import Choice.Syntax
 import Choice.Static
+import Choice.Util
 
 
 -----------
@@ -16,22 +17,8 @@ import Choice.Static
 type Selector      = QTag Int
 type Semantics t a = [(Decision t, Expr t a)]
 type Context t a   = Expr t a -> Expr t a
+type Match t a     = Maybe (Context t a, Expr t a)
 
-
-----------------------
--- Helper Functions --
-----------------------
-
-insert :: Int -> a -> [a] -> [a]
-insert i e es = take i es ++ e : drop (i+1) es
-
-firstJust :: [Maybe a] -> Maybe a
-firstJust = listToMaybe . catMaybes
-
-foldMaybe :: (a -> b -> Maybe b) -> Maybe b -> [a] -> Maybe b
-foldMaybe _ Nothing  _      = Nothing
-foldMaybe _ mb       []     = mb
-foldMaybe f (Just b) (a:as) = foldMaybe f (f a b) as
 
 ---------------
 -- Selection --
@@ -54,7 +41,7 @@ selectIx (d,i) e@(Dim (d' := _) _) | d == d' = e
 selectIx s e = tcmap (selectIx s) e
 
 -- match a context
-match :: (Expr t a -> Bool) -> Expr t a -> Maybe (Context t a, Expr t a)
+match :: (Expr t a -> Bool) -> Expr t a -> Match t a
 match f = m id
   where 
     m c e | f e           = Just (c,e)
@@ -65,7 +52,7 @@ match f = m id
     m c (Dim (d := ts) a) = m (\e -> c (Dim (d := ts) e)) a
     m c (d :? es)         = leftMost f (c . (d:?)) es
         
-    leftMost f c' es = firstJust [m (\e -> c' (insert i e es)) (es !! i)
+    leftMost f c' es = firstJust [m (\e -> c' (replace i es e)) (es !! i)
                                  | i <- [0..length es-1]]
 
 
