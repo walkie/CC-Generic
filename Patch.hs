@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
 
 module Patch where
 
@@ -55,10 +54,9 @@ follow = f id
     f _ _ _ = Nothing
 
 change :: Id -> Change a -> Expr Bool a -> Maybe (Expr Bool a)
-change i (Change p f) e
-    | Just (c,e') <- follow p e = Just $ c $ Let (v:=e') $ pn i :? [f (Var v), Var v]
-    | otherwise                 = Nothing
-  where v = "$" ++ show i
+change i (Change p f) e = fmap chg (follow p e)
+  where chg (c,e') = c $ Let (v:=e') $ pn i :? [f (Var v), Var v]
+        v = "$" ++ show i
 
 apply :: Patch a -> Expr Bool a -> Maybe (Expr Bool a)
 apply (Patch i cs) e = fmap (pdim i) $ foldMaybe (change i) (Just e) cs
