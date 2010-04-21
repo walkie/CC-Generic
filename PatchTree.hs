@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternGuards #-}
 
-module RCS where
+module PatchTree where
 
 import Data.List  (elemIndex)
 import Data.Maybe (fromJust,isJust)
