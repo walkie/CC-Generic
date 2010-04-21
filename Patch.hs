@@ -7,8 +7,9 @@ import Choice
 -- Types
 --
 
-type Id   = Int
-type Path = [Step]
+type Id    = Int
+type Path  = [Step]
+type PExpr = Expr Bool
 
 data Step = S Int   -- structure subIx
           | B Bool  -- binding   inBody?
@@ -16,26 +17,32 @@ data Step = S Int   -- structure subIx
           | C Int   -- choice    subIx
           deriving (Eq,Show)
 
-data Change a = Change Path (Expr Bool a -> Expr Bool a)
+data Change a = Change Path (PExpr a -> PExpr a)
 
 data Patch a = Patch Id [Change a]
-
 
 --
 -- Patch dimension and tag names
 --
 
+-- patch names
 pn :: Id -> Name
 pn i = "P" ++ show i
 
+-- qualified patch tags
 pt :: Id -> QTag Bool
 pt i = (pn i, True)
 
 pf :: Id -> QTag Bool
 pf i = (pn i, False)
 
-pdim :: Id -> Expr Bool a -> Expr Bool a
-pdim i = Dim (pn i := [True,False])
+-- boolean dimension declaration
+bdim :: Name -> Expr Bool a -> Expr Bool a
+bdim n = Dim (n := [True,False])
+
+-- patch dimension declarations
+pdim :: Id -> PExpr a -> PExpr a
+pdim = bdim . pn
 
 
 --
@@ -53,15 +60,15 @@ follow = f id
                                   | otherwise     = f (c . \x -> Let (v:=x) e' ) p e
     f _ _ _ = Nothing
 
-change :: Id -> Change a -> Expr Bool a -> Maybe (Expr Bool a)
+change :: Id -> Change a -> PExpr a -> Maybe (PExpr a)
 change i (Change p f) e = fmap chg (follow p e)
   where chg (c,e') = c $ Let (v:=e') $ pn i :? [f (Var v), Var v]
         v = "$" ++ show i
 
-apply :: Patch a -> Expr Bool a -> Maybe (Expr Bool a)
+apply :: Patch a -> PExpr a -> Maybe (PExpr a)
 apply (Patch i cs) e = fmap (pdim i) $ foldMaybe (change i) (Just e) cs
 
-applyAll :: [Patch a] -> Expr Bool a -> Maybe (Expr Bool a)
+applyAll :: [Patch a] -> PExpr a -> Maybe (PExpr a)
 applyAll ps e = foldMaybe apply (Just e) ps
 
 --
@@ -82,7 +89,7 @@ str = flip ins (leaf "")
 --      |  `-p3'
 --      `-p3
 
-e :: Expr Bool String
+e :: PExpr String
 e = str ""
 
 p1 = Patch 1 [Change [] (ins "ab")]
