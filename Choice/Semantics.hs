@@ -79,9 +79,9 @@ expand m (Let (v := e) e') = expand ((v,expand m e):m) e'
 expand m e                 = tcmap (expand m) e
 
 -- eliminate all let expressions and variables
-makeVarFree :: Expr t a -> Maybe (Expr t a)
-makeVarFree e | varFree e' = Just e'
-              | otherwise  = Nothing
+makeShareFree :: Expr t a -> Maybe (Expr t a)
+makeShareFree e | shareFree e' = Just e'
+                | otherwise    = Nothing
   where e' = expand [] e
 
 -- decisions to variation free expressions
@@ -92,7 +92,7 @@ variants e = map entry (decs [] e)
 -- decisions to plain expressions
 semantics :: Eq t => Expr t a -> Semantics t a
 semantics e = map entry (variants e)
-  where entry (d,e) | Just e' <- makeVarFree e = (d,e')
+  where entry (d,e) | Just e' <- makeShareFree e = (d,e')
 
 
 bug  = dim "A" [True,False]
