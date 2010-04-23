@@ -1,6 +1,8 @@
 
 module Patch where
 
+import Data.Maybe (fromJust)
+
 import Choice
 
 --
@@ -9,7 +11,7 @@ import Choice
 
 type Id    = Int
 type Path  = [Step]
-type PExpr = Expr Bool
+type PExpr = Expr Bool -- patch expressions
 
 data Step = S Int   -- structure subIx
           | B Bool  -- binding   inBody?
@@ -102,3 +104,8 @@ p3 = Patch 3 [Change path (ins "c")]
 
 p3' = Patch 3 [Change path (ins "c")]
   where path = [D, D, B True, C 0, S 1, B False, S 1]
+
+e1  = fromJust $ apply p1 e
+e2  = fromJust $ applyAll [p1,p2] e
+e3  = fromJust $ applyAll [p1,p3] e
+e3' = fromJust $ applyAll [p1,p2,p3] e
