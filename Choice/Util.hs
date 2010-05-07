@@ -26,4 +26,3 @@ foldMaybe :: (a -> b -> Maybe b) -> Maybe b -> [a] -> Maybe b
 foldMaybe _ Nothing  _      = Nothing
 foldMaybe _ mb       []     = mb
 foldMaybe f (Just b) (a:as) = foldMaybe f (f a b) as
-

@@ -90,6 +90,7 @@ str = flip ins (leaf "")
 --      |-p2
 --      |  `-p3'
 --      `-p3
+--      `-p4 -- conflicts with p2
 
 e :: PExpr String
 e = str ""
@@ -105,7 +106,15 @@ p3 = Patch 3 [Change path (ins "c")]
 p3' = Patch 3 [Change path (ins "c")]
   where path = [D, D, B True, C 0, S 1, B False, S 1]
 
-e1  = fromJust $ apply p1 e
-e2  = fromJust $ applyAll [p1,p2] e
-e3  = fromJust $ applyAll [p1,p3] e
-e3' = fromJust $ applyAll [p1,p2,p3] e
+p4 = Patch 4 [Change path (ins "y")]
+  where path = [D, B True, C 0, S 1]
+
+p5 = Patch 5 [Change path (ins "d")]
+  where path = [D, B True, C 0, S 1, S 1]
+
+ab   = fromJust $ apply p1 e
+axb  = fromJust $ applyAll [p1,p2] e
+ayb  = fromJust $ applyAll [p1,p4] e
+abc  = fromJust $ applyAll [p1,p3] e
+abd  = fromJust $ applyAll [p1,p5] e
+--axbc = fromJust $ applyAll [p1,p2,p3'] e
