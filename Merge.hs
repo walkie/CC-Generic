@@ -3,7 +3,7 @@
 module Merge where
 
 import Data.Function (on)
-import Data.List     (elemIndex,nub,sort,sortBy)
+import Data.List     (elemIndex,find,nub,sort,sortBy)
 import Data.Maybe    (fromJust,fromMaybe)
 
 import Choice
@@ -13,41 +13,8 @@ import Patch
 -- Merging patch expressions
 --
 
-{-
-merge :: Eq a => PExpr a -> PExpr a -> PExpr a
-merge a b = foldr ($) (merge' a' b') (map bdim ds)
-  where (ads,a') = stripDims a
-        (bds,b') = stripDims b
-        ds = (sort . nub) (ads ++ bds)
-
--- Pattern match failure indicates invalid expressions,
--- error "Conflict!" indicates an actual conflict.
-merge' :: Eq a => PExpr a -> PExpr a -> PExpr a
-
-merge' (a :< as) (b :< bs) 
-    | a == b, length as == length bs = a :< zipWith merge' as bs
-merge' (d :? ds) (e :? es) 
-    | d == e, length ds == length es = d :? zipWith merge' ds es
-    | d /= e                         = error "Conflict!"
-
-merge' (Var v) (Var w) | v == w = (Var v)
-
-merge' (Let (v:=a) (d :? ds)) (Let (w:=b) (e :? es))
-    | v == w, d == e,
-      length ds == length es = Let (v := merge' a b) $ d :? zipWith merge' ds es
-    | d /= e                 = error "Conflict!"
-
-merge' a (Let (v:=b) (d :? cs)) = Let (v := merge' a b) (d :? cs)
-merge' (Let (v:=a) (d :? cs)) b = Let (v := merge' a b) (d :? cs)
-
-stripDims :: PExpr a -> ([Name], PExpr a)
-stripDims e = strip ([],e)
-  where strip (ds,Dim (d:=_) e) = strip (d:ds,e)
-        strip (ds,e           ) = (ds,e)
--}
-
-data TagMerge t = TM Int [Int] [Int] deriving (Eq,Show)
-type MergeMap t = Map (TagMerge t)
+data TagMerge = TM Int [Int] [Int] deriving (Eq,Show)
+type MergeMap = Map TagMerge
   
 maybes :: (a -> b) -> (a -> a -> b) -> Maybe a -> Maybe a -> b
 maybes _ g (Just a) (Just b) = g a b
@@ -63,52 +30,66 @@ buildList l a as = [fromMaybe a (lookup i as) | i <- [0..l-1]]
 mergeLists :: Int -> (a -> a -> a) -> [(Int,a)] -> [(Int,a)] -> [a]
 mergeLists l f as bs = [lookups (maybes id f) i as bs | i <- [0..l-1]]
 
-mergeTags :: Ord t => [t] -> [t] -> ([t],TagMerge t)
+mergeTags :: Ord t => [t] -> [t] -> ([t],TagMerge)
 mergeTags ts us = (vs, TM (length vs) (ix ts) (ix us))
   where vs = nub (ts ++ us)
         ix = map (fromJust . flip elemIndex vs)
 
-mergeDims :: Ord t => Dims t -> Dims t -> (Dims t, MergeMap t)
+mergeDims :: Ord t => Dims t -> Dims t -> (Dims t, MergeMap)
 mergeDims as bs = ([(n,ts) | (n,(ts,_)) <- m], [(n,tm) | (n,(_,tm)) <- m])
   where mds ns = [(n, lookups (maybes (dup mergeTags) mergeTags) n as bs) | n <- ns]
         m = (mds . nub) (dom as ++ dom bs)
 
+newChoice :: (Eq t, Eq a) => Bool -> MergeMap -> Name -> Name -> Expr t a -> Expr t a -> Name -> [Expr t a] -> Expr t a
+newChoice isL m c v l r d as = Let (v := merge' m c l r) $ d :?
+    case lookup d m of
+      Just (TM n is js) -> buildList n (Var v) (zip (if isL then is else js) as)
+      Nothing           -> as
+
+conflictDimName :: Dims t -> Name
+conflictDimName ds = fromJust $ find (flip notElem (dom ds)) (map name [1..])
+  where name n = "*Conflict" ++ id n ++ "*"
+        id 1 = ""
+        id n = show n
+
+conflictDim :: Dims t -> t -> t -> Expr t a -> Expr t a
+conflictDim ds l r = Dim (conflictDimName ds := [l,r])
+
 declareDims :: Dims t -> Expr t a -> Expr t a
 declareDims ds e = foldr Dim e (rezip (:=) ds)
 
-merge :: (Ord t, Eq a) => Expr t a -> Expr t a -> Expr t a
-merge e f | not (dimLinear e && dimLinear f) = error "Only dimension linear expressions can be merged!"
-          | otherwise = declareDims ds (merge' m e f)
-  where (ds,m) = mergeDims (dims e) (dims f)
+merge :: (Ord t, Eq a) => t -> t -> Expr t a -> Expr t a -> Expr t a
+merge cl cr l r | not (dimLinear l && dimLinear r) = error "Only dimension linear expressions can be merged!"
+                | otherwise = wrap merged
+  where (ds,m) = mergeDims (dims l) (dims r)
+        cd     = conflictDimName ds
+        merged = declareDims ds (merge' m cd l r)
+        wrap | cd `elem` freeDims merged = Dim (cd := [cl,cr])
+             | otherwise                 = id
 
 --
 -- the core of the merge algorithm
 --
-merge' :: (Ord t, Eq a) => MergeMap t -> Expr t a -> Expr t a -> Expr t a
+
+merge' :: (Eq t, Eq a) => MergeMap -> Name -> Expr t a -> Expr t a -> Expr t a
 
 -- remove dimension declarations
-merge' m (Dim _ e) f         = merge' m e f
-merge' m e         (Dim _ f) = merge' m e f
+merge' m c (Dim _ l) r         = merge' m c l r
+merge' m c l         (Dim _ r) = merge' m c l r
 
 -- merge choices
-merge' m (a :? es) (b :? fs) | a == b, Just (TM l is js) <- lookup a m
-    = a :? mergeLists l (merge' m) (zip is es) (zip js fs)
+merge' m c (ld :? ls) (rd :? rs) | ld == rd, Just (TM len is js) <- lookup ld m
+    = ld :? mergeLists len (merge' m c) (zip is ls) (zip js rs)
 
 -- default case, propogate merge to children
-merge' m a b | a ~= b = czip (merge' m) a b
+merge' m c l r | l ~= r = czip (merge' m c) l r
 
 -- incorporate new choices
-merge' m (Let (v:=a) (d :? cs)) b = Let (v := merge' m a b) $ d :?
-    case lookup d m of
-      Just (TM l is _) -> buildList l (Var v) (zip is cs)
-      Nothing          -> cs
-merge' m a (Let (v:=b) (d :? cs)) = Let (v := merge' m a b) $ d :?
-    case lookup d m of
-      Just (TM l _ js) -> buildList l (Var v) (zip js cs)
-      Nothing          -> cs
+merge' m c (Let (v:=l) (d :? as)) r = newChoice True  m c v l r d as
+merge' m c l (Let (v:=r) (d :? as)) = newChoice False m c v l r d as
 
--- everything else...
-merge' _ _ _ = error "Kaboom!"
+-- everything else is a conflict...
+merge' _ c l r = c :? [l,r]
 
 
 -- Shallow equality
@@ -139,4 +120,10 @@ rezip f abs = [f a b | (a,b) <- abs]
 -- Testing
 --
 
-axbc = merge axb abc
+mergeLR :: Eq a => Expr String a -> Expr String a -> Expr String a
+mergeLR = merge "Left" "Right"
+
+mergeTF :: Eq a => Expr Bool a -> Expr Bool a -> Expr Bool a
+mergeTF = merge True False
+
+axbc = mergeTF axb abc

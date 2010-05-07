@@ -4,20 +4,14 @@ module Patch where
 import Data.Maybe (fromJust)
 
 import Choice
+import Edit
 
 --
 -- Types
 --
 
 type Id    = Int
-type Path  = [Step]
 type PExpr = Expr Bool -- patch expressions
-
-data Step = S Int   -- structure subIx
-          | B Bool  -- binding   inBody?
-          | D       -- dimDecl
-          | C Int   -- choice    subIx
-          deriving (Eq,Show)
 
 data Change a = Change Path (PExpr a -> PExpr a)
 
@@ -50,17 +44,6 @@ pdim = bdim . pn
 --
 -- Applying patches
 -- 
-
-follow :: Path -> Expr t a -> Match t a
-follow = f id
-  where
-    f c [] e = Just (c,e)
-    f c (D   : p) (Dim d e)                       = f (c . Dim d               ) p e
-    f c (S i : p) (a :< es)       | i < length es = f (c . (a:<) . replace i es) p (es !! i)
-    f c (C i : p) (d :? es)       | i < length es = f (c . (d:?) . replace i es) p (es !! i)
-    f c (B b : p) (Let (v:=e) e') | b             = f (c . Let (v:=e)          ) p e'
-                                  | otherwise     = f (c . \x -> Let (v:=x) e' ) p e
-    f _ _ _ = Nothing
 
 change :: Id -> Change a -> PExpr a -> Maybe (PExpr a)
 change i (Change p f) e = fmap chg (follow p e)
