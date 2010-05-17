@@ -1,6 +1,8 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses, PatternGuards #-}
 
 module Zipper where
+
+import Maybe (fromMaybe)
 
 import Choice hiding (Context)
 
@@ -8,7 +10,7 @@ import Choice hiding (Context)
 -- Generic zipper stuff.
 --
 
-data Zipper f a = Zipper (Context f) a deriving (Eq,Show)
+data Zipper f a = Z (Context f) a deriving (Eq,Show)
 
 data Context f = Context f :> f
                | Top
@@ -23,74 +25,85 @@ class Focus f a where
 (.>) = flip (.)
 
 enter :: a -> Zipper f a
-enter = Zipper Top
+enter = Z Top
 
 exit :: Focus f a => Zipper f a -> a
-exit (Zipper Top a) = a
-exit z              = exit (up z)
+exit (Z Top a) = a
+exit z         = exit (up z)
 
 exec :: Focus f a => Step f a -> a -> a
 exec s = enter .> s .> exit
 
 up :: Focus f a => Step f a
-up (Zipper Top      a) = Zipper Top a
-up (Zipper (c :> f) a) = Zipper c (apply f a)
+up (Z Top      a) = Z Top a
+up (Z (c :> f) a) = Z c (apply f a)
 
 
 --
--- Choice calculus specific stuff
+-- Choice calculus specific stuff.
 --
 
-data CCFocus t a =
-    D {- DimUse  -} (Bind [t])
-  | C {- Alt     -} Name [Expr t a] [Expr t a]
-  | S {- SubObj  -} a    [Expr t a] [Expr t a]
-  | B {- LetBind -} Name (Expr t a) 
-  | U {- LetUse  -} (Bind (Expr t a))
+data CCFocus t a = CCF (Map Int) (ExprFocus t a)
+
+data ExprFocus t a =
+    D (Bind [t])
+  | C Name [Expr t a] [Expr t a]
+  | S a    [Expr t a] [Expr t a]
+  | B Name (Expr t a) 
+  | U (Bind (Expr t a))
   deriving (Eq,Show)
 
-instance Focus (CCFocus t a) (Expr t a) where
-  apply (D b)       e = Dim b e
-  apply (C d as bs) e = d :? (as ++ e:bs)
-  apply (S a as bs) e = a :< (as ++ e:bs)
-  apply (B v e')    e = Let (v:=e) e'
-  apply (U b)       e = Let b e
+type CCContext t a = Context (CCFocus t a)
+type CCStep    t a = Step    (CCFocus t a) (Expr t a)
 
-type CCStep t a = Step (CCFocus t a) (Expr t a)
+instance Focus (CCFocus t a) (Expr t a) where
+  apply (CCF _ f) e = apply' f e 
+
+apply' :: ExprFocus t a -> Expr t a -> Expr t a
+apply' (D b)       e = Dim b e
+apply' (C d as bs) e = d :? (as ++ e:bs)
+apply' (S a as bs) e = a :< (as ++ e:bs)
+apply' (B v e')    e = Let (v:=e) e'
+apply' (U b)       e = Let b e
+
+-- Navigating CC expressions.
+
+dimNs :: CCContext t a -> Map Int
+dimNs Top            = []
+dimNs (_ :> CCF m _) = m
+
+zoom :: CCContext t a -> ExprFocus t a -> CCContext t a
+zoom c f = c :> CCF (dimNs c) f
 
 inDim :: CCStep t a
-inDim (Zipper c (Dim b e)) = Zipper (c :> D b) e
+inDim (Z c (Dim b e)) = Z c' e
+  where c' = c :> CCF ((var b, length (val b)) : dimNs c) (D b)
 
 inAlt :: Int -> CCStep t a
-inAlt i (Zipper c (d :? es)) = Zipper (c :> C d as bs) b
+inAlt i (Z c (d :? es)) = Z (c `zoom` C d as bs) b
   where (as,b:bs) = splitAt i es
 
 inSub :: Int -> CCStep t a
-inSub i (Zipper c (a :< es)) = Zipper (c :> S a as bs) b
+inSub i (Z c (a :< es)) = Z (c `zoom` S a as bs) b
   where (as,b:bs) = splitAt i es
 
 inBind :: CCStep t a
-inBind (Zipper c (Let (v:=b) u)) = Zipper (c :> B v u) b
+inBind (Z c (Let (v:=b) u)) = Z (c `zoom` B v u) b
 
 inUse :: CCStep t a
-inUse (Zipper c (Let b u)) = Zipper (c :> U b) u
+inUse (Z c (Let b u)) = Z (c `zoom` U b) u
 
-{-
-data Zipper t a = Z (Context t a) (Expr t a) deriving Eq
+-- Editing CC expressions.
 
-data Context t a = Context t a :> Focus t a
-                 | Top
-                 deriving (Eq,Show)
+addDim :: Bind [t] -> CCStep t a
+addDim b (Z c e) = Z c (Dim b e)
 
-enter :: Expr t a -> Zipper t a
-enter = Z Top
+addChoice :: Name -> [Maybe (Expr t a)] -> CCStep t a
+addChoice d as (Z c e)
+    | Just n <- lookup d (dimNs c)
+    , n == length as
+    = Z c $ Let (v := e) (d :? map (fromMaybe (Var v)) as)
+  where v = safeVar "$" e
 
-exit :: Zipper t a -> Expr t a
-exit (Z Top e) = e
-exit z         = exit (up z)
-
-up :: Step t a
-up (Z Top e)      = Z Top e
-up (Z (c :> f) e) = Z c (apply f e)
--}
-
+addTag :: t -> CCStep t a
+addTag = undefined
