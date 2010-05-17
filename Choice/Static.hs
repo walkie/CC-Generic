@@ -1,7 +1,7 @@
 {-# LANGUAGE PatternGuards #-}
 module Choice.Static where
 
-import Data.List     (concatMap,delete,nub)
+import Data.List (concatMap,delete,find,nub)
 
 import Choice.Syntax
 import Choice.Util hiding (delete)
@@ -47,6 +47,18 @@ freeVars (Let (v := _) e) = delete v (freeVars e)
 freeVars (Var v)          = [v]
 freeVars e                = union (cmap freeVars e)
 
+safeX :: (Expr t a -> [Name]) -> Name -> Expr t a -> Name
+safeX f n e = v
+  where Just v = find (flip notElem (f e)) [n ++ show i | i <- [1..]]
+
+-- get a new variable name that won't capture any free variables
+safeVar :: Name -> Expr t a -> Name
+safeVar = safeX freeVars
+
+-- get a new dimension name that won't capture any free dimensions
+safeDim :: Name -> Expr t a -> Name
+safeDim = safeX freeDims
+
 -- all dimension declarations
 dims :: Expr t a -> Dims t
 dims (Dim (d := ts) e) = (d,ts) : dims e
@@ -56,6 +68,25 @@ dims e                 = concat (cmap dims e)
 dimLinear :: Expr t a -> Bool
 dimLinear e = ds == nub ds
   where ds = map fst (dims e)
+
+stripDeadLets :: Expr t a -> Expr t a
+stripDeadLets (Let (v:=e) e') 
+    | v `elem` freeVars e' = Let (v:=e) (stripDeadLets e')
+    | otherwise            = stripDeadLets e'
+stripDeadLets e = tcmap stripDeadLets e
+
+
+{- WRONG
+-- make the expression dimension linear
+makeDimLinear :: Expr t a -> Expr t a
+makeDimLinear e | dimLinear e = e
+                | otherwise   = fix [] e
+  where fix ds (Dim (d:=ts) e) 
+          | d `elem` ds = let d' = safeDim d e
+                          in Dim (d':=ts) (fix (d':ds) e)
+          | otherwise   = Dim (d:=ts) (fix ds e)
+        fix ds e = tcmap (fix ds) e
+-}
 
 -- is the expression well dimensioned?
 wellDim :: Expr t a -> Bool
