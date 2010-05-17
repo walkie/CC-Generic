@@ -58,6 +58,7 @@ conflictDim ds l r = Dim (conflictDimName ds := [l,r])
 declareDims :: Dims t -> Expr t a -> Expr t a
 declareDims ds e = foldr Dim e (rezip (:=) ds)
 
+-- symmetric merge
 merge :: (Ord t, Eq a) => t -> t -> Expr t a -> Expr t a -> Expr t a
 merge cl cr l r | not (dimLinear l && dimLinear r) = error "Only dimension linear expressions can be merged!"
                 | otherwise = wrap merged
@@ -90,18 +91,6 @@ merge' m c l (Let (v:=r) (d :? as)) = newChoice False m c v l r d as
 
 -- everything else is a conflict...
 merge' _ c l r = c :? [l,r]
-
-
--- Shallow equality
-
-infix 4 ~=
-(~=) :: (Eq t, Eq a) => Expr t a -> Expr t a -> Bool
-a :< as      ~= b :< bs      = a == b && length as == length bs
-Let (v:=_) _ ~= Let (w:=_) _ = v == w
-Var v        ~= Var w        = v == w
-Dim (a:=t) _ ~= Dim (b:=u) _ = a == b && t == u
-a :? as      ~= b :? bs      = a == b && length as == length bs
-_            ~= _            = False
 
 --
 -- Helper functions
