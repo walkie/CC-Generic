@@ -19,17 +19,13 @@ data CC a =
   deriving Eq
 
 
-------------------------
--- Smart Constructors --
-------------------------
+----------------------
+-- Useful Functions --
+----------------------
 
+-- smart constructor for leaf nodes
 leaf :: a -> CC a
 leaf a = Str a []
-
-
-----------------------
--- Helper Functions --
-----------------------
 
 -- immediate subexpressions of an expression
 subs :: CC a -> [CC a]
@@ -55,6 +51,9 @@ mapSubs f = map f . subs
 transformSubs :: (CC a -> CC a) -> CC a -> CC a
 transformSubs f e = replaceSubs e (mapSubs f e)
 
+-- monadic version of transformSubs
+transformSubsM :: Monad m => (CC a -> m (CC a)) -> CC a -> m (CC a)
+transformSubsM f e = sequence (mapSubs f e) >>= return . replaceSubs e
 
 ---------------
 -- Instances --
