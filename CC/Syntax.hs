@@ -5,9 +5,10 @@ module CC.Syntax where
 -- Syntax --
 ------------
 
-type Dim = String
-type Tag = String
-type Var = String
+type Name = String
+type Dim = Name
+type Tag = Name
+type Var = Name
 
 data CC a =
     Str a          [CC a] -- structure

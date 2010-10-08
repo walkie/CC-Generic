@@ -1,131 +1,101 @@
-{-# LANGUAGE PatternGuards #-}
-module Choice.Static where
+module CC.Static where
 
-import Data.List (concatMap,delete,find,nub)
+import Data.List  (find)
+import Data.Maybe (fromJust)
+import Data.Set   (Set)
+import qualified Data.Set as S
 
-import Choice.Syntax
-import Choice.Util hiding (delete)
-
------------
--- Types --
------------
-
--- mapping from names to values
-type Map a = [(Name,a)]
-
--- mapping from dimension names to lists of tags
-type Dims t = Map [t]
-
--- qualified tag
-type QTag t = (Name,t)
-
--- decision
-type Decision t = [QTag t]
+import CC.Syntax
 
 
-----------------------
--- Helper Functions --
-----------------------
+--------------------------
+-- Free and Bound Names --
+--------------------------
 
-dom = map fst
-rng = map snd
+-- set of bound dimensions
+boundDims :: CC a -> Set Dim
+boundDims (Dim d _ e) = S.insert d (boundDims e)
+boundDims e           = S.unions (mapSubs boundDims e)
 
-
----------------------------
--- Basic Static Analyses --
----------------------------
+-- set of bound variables
+boundVars :: CC a -> Set Var
+boundVars (Let v b e) = S.insert v (boundVars b `S.union` boundVars e)
+boundVars e           = S.unions (mapSubs boundVars e)
 
 -- set of free dimensions
-freeDims :: Expr t a -> [Name]
-freeDims (Dim (d := _) e) = delete d (freeDims e)
-freeDims (d :? es)        = nub (d : concatMap freeDims es)
-freeDims e                = union (cmap freeDims e)
+freeDims :: CC a -> Set Dim
+freeDims (Dim d _ e) = S.delete d (freeDims e)
+freeDims (Chc d es)  = S.insert d (S.unions (map freeDims es))
+freeDims e           = S.unions (mapSubs freeDims e)
 
 -- set of free variables
-freeVars :: Expr t a -> [Name]
-freeVars (Let (v := _) e) = delete v (freeVars e)
-freeVars (Var v)          = [v]
-freeVars e                = union (cmap freeVars e)
+freeVars :: CC a -> Set Var
+freeVars (Let v b e) = S.delete v (freeVars e) `S.union` freeVars b
+freeVars (Ref v)     = S.singleton v
+freeVars e           = S.unions (mapSubs freeVars e)
 
-safeX :: (Expr t a -> [Name]) -> Name -> Expr t a -> Name
-safeX f n e = v
-  where Just v = find (flip notElem (f e)) [n ++ show i | i <- [1..]]
+-- generate an unused name given a seed name, used names are given in a set
+safeName :: Name -> Set Name -> Name
+safeName n s = fromJust $ find (flip S.notMember s) [n ++ show i | i <- [1..]]
 
--- get a new variable name that won't capture any free variables
-safeVar :: Name -> Expr t a -> Name
-safeVar = safeX freeVars
+-- generate a variable name from a seed that won't capture any free variables
+-- in the given expression
+safeVar :: Var -> CC a -> Var
+safeVar v = safeName v . freeVars
 
--- get a new dimension name that won't capture any free dimensions
-safeDim :: Name -> Expr t a -> Name
-safeDim = safeX freeDims
-
--- all dimension declarations
-dims :: Expr t a -> Dims t
-dims (Dim (d := ts) e) = (d,ts) : dims e
-dims e                 = concat (cmap dims e)
-
--- is the expression dimension linear?
-dimLinear :: Expr t a -> Bool
-dimLinear e = ds == nub ds
-  where ds = map fst (dims e)
-
-stripDeadLets :: Expr t a -> Expr t a
-stripDeadLets (Let (v:=e) e') 
-    | v `elem` freeVars e' = Let (v:=e) (stripDeadLets e')
-    | otherwise            = stripDeadLets e'
-stripDeadLets e = tcmap stripDeadLets e
+-- generate a dimension name from a seed that won't capture any free dimensions
+-- in the given expression
+safeDim :: Dim -> CC a -> Dim
+safeDim d = safeName d . freeDims
 
 
-{- WRONG
--- make the expression dimension linear
-makeDimLinear :: Expr t a -> Expr t a
-makeDimLinear e | dimLinear e = e
-                | otherwise   = fix [] e
-  where fix ds (Dim (d:=ts) e) 
-          | d `elem` ds = let d' = safeDim d e
-                          in Dim (d':=ts) (fix (d':ds) e)
-          | otherwise   = Dim (d:=ts) (fix ds e)
-        fix ds e = tcmap (fix ds) e
--}
-
--- is the expression well dimensioned?
-wellDim :: Expr t a -> Bool
-wellDim = well []
-  where well :: Map Int -> Expr t a -> Bool
-        well m (Dim (d := ts) e) = well ((d,length ts):m) e
-        well m (d :? es)
-          | Just n <- lookup d m = length es == n && all (well m) es
-          | otherwise            = False
-        well m e                 = all (well m) (children e)
-
--- is the expression dimension free?
-dimFree :: Expr t a -> Bool
-dimFree (Dim _ _) = False
-dimFree e         = all dimFree (children e)
-
--- is the expression choice free?
-choiceFree :: Expr t a -> Bool
-choiceFree (_ :? _) = False
-choiceFree e        = all choiceFree (children e)
+--------------------------
+-- X-Free and Plainness --
+--------------------------
 
 -- is the expression binding free?
-bindFree :: Expr t a -> Bool
-bindFree (Let _ _) = False
-bindFree e         = all bindFree (children e)
+bindFree :: CC a -> Bool
+bindFree (Let _ _ _) = False
+bindFree e           = all bindFree (subs e)
 
 -- is the expression reference free?
-refFree :: Expr t a -> Bool
-refFree (Var _) = False
-refFree e       = all refFree (children e)
+refFree :: CC a -> Bool
+refFree (Ref _) = False
+refFree e       = all refFree (subs e)
 
--- is the expression variation free?
-varFree :: Expr t a -> Bool
-varFree e = dimFree e && choiceFree e
+-- is the expression dimension free?
+dimFree :: CC a -> Bool
+dimFree (Dim _ _ _) = False
+dimFree e           = all dimFree (subs e)
+
+-- is the expression choice free?
+choiceFree :: CC a -> Bool
+choiceFree (Chc _ _) = False
+choiceFree e         = all choiceFree (subs e)
 
 -- is the expression sharing free?
-shareFree :: Expr t a -> Bool
+shareFree :: CC a -> Bool
 shareFree e = bindFree e && refFree e
 
+-- is the expression variation free?
+variationFree :: CC a -> Bool
+variationFree e = dimFree e && choiceFree e
+
 -- is the expression plain?
-plain :: Expr t a -> Bool
-plain e = varFree e && shareFree e
+plain :: CC a -> Bool
+plain e = variationFree e && shareFree e
+
+
+--------------------------
+-- Well Dimensionedness --
+--------------------------
+
+-- is the expression well dimensioned?
+wellDim :: CC a -> Bool
+wellDim = well []
+  where well :: [(Dim,Int)] -> CC a -> Bool
+        well m (Dim d ts e) = well ((d,length ts):m) e
+        well m (Chc d es) = case lookup d m of
+                              Just n    -> length es == n && all (well m) es
+                              otherwise -> False
+        well m e = all (well m) (subs e)
