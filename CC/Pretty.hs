@@ -59,7 +59,7 @@ val = return . showCC
 op,key,var,dim,tag :: String -> Pretty String
 op  = adorn _op
 key = adorn _key
-var = adorn _var
+var = adorn _var . ('$':)
 dim = adorn _dim
 tag = adorn _tag
 
