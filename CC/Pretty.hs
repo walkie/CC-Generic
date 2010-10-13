@@ -1,106 +1,88 @@
-{-# LANGUAGE TypeSynonymInstances #-}
+module CC.Pretty (pretty,bw,color) where
 
--- uncomment one of the following lines to choose colored or uncolored output
-{-# OPTIONS_GHC -cpp -DCOLOR #-} -- color
---{-# OPTIONS_GHC -cpp #-}       -- no color
-
-module CC.Pretty where
-
+import Control.Monad.State
 import Data.List (intersperse)
 
 import CC.Syntax
 
 
----------------------
--- Pretty Printing --
----------------------
+----------------------
+-- Public Interface --
+----------------------
 
-showOp :: String -> String
-showOp = color blue 
+pretty :: Show a => Colors -> CC a -> String
+pretty c e = evalState (cc e) c
 
-showKey :: String -> String
-showKey = color (blue ++ boldOn)
+bw,color :: Colors
+bw    = Colors id id id id id
+color = Colors { _op  = style blue,
+                 _key = style (blue ++ bold),
+                 _var = style red,
+                 _dim = style green,
+                 _tag = style green }
 
-showVar :: Var -> String
-showVar = color red 
-
-showDim :: Dim -> String
-showDim = color green
-
-showTag :: Tag -> String
-showTag = color green
-
-showInParens :: String -> String
-showInParens s = showOp "(" ++ s ++ showOp ")"
-
-showInBracks :: String -> String
-showInBracks s = showOp "<" ++ s ++ showOp ">"
-
-showSeq :: String -> [String] -> String
-showSeq sep = concat . intersperse sep
-
-showBrackSeq :: (a -> String) -> [a] -> String
-showBrackSeq f = showInBracks . showSeq "," . map f
-
-showTags :: [Tag] -> String
-showTags = showBrackSeq showTag
-
-showAlts :: ShowNest a => [CC a] -> String
-showAlts = showBrackSeq showCC
-
-showCC :: ShowNest a => CC a -> String
-showCC (Str a [])  = showValue a
-showCC (Str a es)  = concat [showValue a, showOpen a, showSeq (showSep a) (map showCC es), showClose a]
-showCC (Let v b e) = concat [showKey "let ", showVar v, showOp " = ", showInParens (showCC b), showKey " in ", showInParens (showCC e)]
-showCC (Ref v)     = showVar v
-showCC (Dim d t e) = concat [showKey "dim ", showDim d, showTags t, showKey " in ", showInParens (showCC e)]
-showCC (Chc d es)  = concat [showDim d, showAlts es]
-
-instance ShowNest a => Show (CC a) where
-  show = showCC
+instance Show a => Show (CC a) where
+  show = pretty color -- Windows users: change to "pretty bw"
 
 
-------------
--- Values --
-------------
+-------------
+-- Innards --
+-------------
 
-class Show a => ShowNest a where
-  showValue :: a -> String
-  showOpen  :: a -> String
-  showSep   :: a -> String
-  showClose :: a -> String
-  showValue   = show
-  showOpen  _ = "{"
-  showSep   _ = ","
-  showClose _ = "}"
+data Colors = Colors {
+  _op  :: String -> String,
+  _key :: String -> String,
+  _var :: String -> String,
+  _dim :: String -> String,
+  _tag :: String -> String
+}
 
-instance ShowNest Bool
-instance ShowNest Char    where showValue = (:[])
-instance ShowNest Integer
-instance ShowNest String
-  --showS = id
-  --opAng _ = ""
-  --comma _ = ""
-  --clAng _ = ""
+type Pretty = State Colors
+
+cat :: [Pretty String] -> Pretty String
+cat = liftM concat . sequence
+
+adorn :: (Colors -> String -> String) -> String -> Pretty String
+adorn f s = get >>= return . flip f s
+
+val :: Show a => a -> Pretty String
+val = return . show
+
+op,key,var,dim,tag :: String -> Pretty String
+op  = adorn _op
+key = adorn _key
+var = adorn _var
+dim = adorn _dim
+tag = adorn _tag
+
+commas :: (String -> Pretty String) -> [Pretty String] -> Pretty String
+commas f = cat . intersperse (f ",")
+
+surround :: (String -> Pretty String) -> String -> String -> Pretty String -> Pretty String
+surround f l r s = cat [f l, s, f r]
+
+braces,bracks,parens :: Pretty String -> Pretty String
+braces = surround return "{" "}"
+bracks = surround op     "<" ">"
+parens = surround op     "(" ")"
+
+cc :: Show a => CC a -> Pretty String
+cc (Str a [])  = val a
+cc (Str a es)  = cat [val a, (braces . commas return) (map cc es)]
+cc (Let v b u) = cat [key "let ", var v, op " = ", parens (cc b), key " in ", parens (cc u)]
+cc (Ref v)     = var v
+cc (Dim d t e) = cat [key "dim ", dim d, (bracks . commas op) (map tag t), key " in ", parens (cc e)]
+cc (Chc d es)  = cat [dim d, (bracks . commas op) (map cc es)]
 
 
 --------------------------------------
 -- Martin's Color Module (modified) --
 --------------------------------------
 
-type Color = String
+reset = "\27[0m"
+bold  = "\27[1m"
 
-#ifdef COLOR
-reset  = "\27[0m"
-boldOn = "\27[1m"
-
-attrFG :: Int -> String
 attrFG c = "\27[3" ++ show c ++ "m"
-#else -- NO COLOR
-reset    = ""
-boldOn   = ""
-attrFG _ = ""
-#endif
 
 black  = attrFG 0
 red    = attrFG 1
@@ -113,5 +95,4 @@ white  = attrFG 7
 
 defaultColor = black ++ reset
 
-color :: Color -> String -> String
-color c s = c ++ s ++ defaultColor
+style c s = c ++ s ++ defaultColor
