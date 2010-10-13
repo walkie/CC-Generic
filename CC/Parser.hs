@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeSynonymInstances #-}
+
 module CC.Parser (parse,makeBW,ReadCC(..)) where
 
 import CC.Syntax

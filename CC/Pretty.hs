@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeSynonymInstances #-}
+
 module CC.Pretty (pretty,bw,color,ShowCC(..)) where
 
 import Control.Monad.State
