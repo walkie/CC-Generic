@@ -1,4 +1,5 @@
-module CC.Pretty (pretty,bw,color) where
+{-# LANGUAGE TypeSynonymInstances #-}
+module CC.Pretty (pretty,bw,color,ShowCC(..)) where
 
 import Control.Monad.State
 import Data.List (intersperse)
@@ -10,7 +11,7 @@ import CC.Syntax
 -- Public Interface --
 ----------------------
 
-pretty :: Show a => Colors -> CC a -> String
+pretty :: ShowCC a => Colors -> CC a -> String
 pretty c e = evalState (cc e) c
 
 bw,color :: Colors
@@ -21,7 +22,14 @@ color = Colors { _op  = style blue,
                  _dim = style green,
                  _tag = style green }
 
-instance Show a => Show (CC a) where
+class ShowCC a where
+  showCC :: a -> String
+instance ShowCC Int where
+  showCC = show
+instance ShowCC String where
+  showCC = id
+
+instance ShowCC a => Show (CC a) where
   show = pretty color -- Windows users: change to "pretty bw"
 
 
@@ -45,8 +53,8 @@ cat = liftM concat . sequence
 adorn :: (Colors -> String -> String) -> String -> Pretty String
 adorn f s = get >>= return . flip f s
 
-val :: Show a => a -> Pretty String
-val = return . show
+val :: ShowCC a => a -> Pretty String
+val = return . showCC
 
 op,key,var,dim,tag :: String -> Pretty String
 op  = adorn _op
@@ -66,7 +74,7 @@ braces = surround return "{" "}"
 bracks = surround op     "<" ">"
 parens = surround op     "(" ")"
 
-cc :: Show a => CC a -> Pretty String
+cc :: ShowCC a => CC a -> Pretty String
 cc (Str a [])  = val a
 cc (Str a es)  = cat [val a, (braces . commas return) (map cc es)]
 cc (Let v b u) = cat [key "let ", var v, op " = ", parens (cc b), key " in ", parens (cc u)]
