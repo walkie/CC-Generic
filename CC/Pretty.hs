@@ -31,7 +31,7 @@ showTag :: Tag -> String
 showTag = color green
 
 showInParens :: String -> String
-showInParens s = "(" ++ s ++ ")"
+showInParens s = showOp "(" ++ s ++ showOp ")"
 
 showInBracks :: String -> String
 showInBracks s = showOp "<" ++ s ++ showOp ">"
@@ -51,9 +51,9 @@ showAlts = showBrackSeq showCC
 showCC :: ShowNest a => CC a -> String
 showCC (Str a [])  = showValue a
 showCC (Str a es)  = concat [showValue a, showOpen a, showSeq (showSep a) (map showCC es), showClose a]
-showCC (Let v b e) = concat [showKey "let ", showVar v, showOp " = ", showCC b, showKey " in\n", showCC e]
+showCC (Let v b e) = concat [showKey "let ", showVar v, showOp " = ", showInParens (showCC b), showKey " in ", showInParens (showCC e)]
 showCC (Ref v)     = showVar v
-showCC (Dim d t e) = concat [showKey "dim ", showDim d, showTags t, showKey " in\n", showCC e]
+showCC (Dim d t e) = concat [showKey "dim ", showDim d, showTags t, showKey " in ", showInParens (showCC e)]
 showCC (Chc d es)  = concat [showDim d, showAlts es]
 
 instance ShowNest a => Show (CC a) where
