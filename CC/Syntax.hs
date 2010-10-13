@@ -27,6 +27,13 @@ data CC a =
 leaf :: a -> CC a
 leaf a = Str a []
 
+-- true if this is a leaf node
+isLeaf :: CC a -> Bool
+isLeaf (Ref _)    = True
+isLeaf (Str _ []) = True
+isLeaf (Chc _ []) = True
+isLeaf _          = False
+
 -- immediate subexpressions of an expression
 subs :: CC a -> [CC a]
 subs (Str _ es)  = es
