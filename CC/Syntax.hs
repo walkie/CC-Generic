@@ -23,7 +23,7 @@ data CC a =
 -- choice calculus branch type
 data CCB a = Str a   -- structural branching
            | Chc Dim -- choice branching
-  deriving (Eq,Data,Typeable)
+  deriving (Eq,Show,Data,Typeable)
 
 ----------------------
 -- Useful Functions --
