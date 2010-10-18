@@ -86,7 +86,22 @@ struct :: ReadCC a => Parser (CC a)
 struct = do
     a  <- readCC
     es <- option [] (braces (list expr))
-    return (Str a es)
+    return (Str a :< es)
+
+choice :: ReadCC a => Parser (CC a)
+choice = do
+    d  <- identifier
+    as <- angles (list expr)
+    return (Chc d :< as)
+
+dim :: ReadCC a => Parser (CC a)
+dim = do 
+    reserved "dim"
+    d  <- identifier
+    ts <- angles (list identifier)
+    reserved "in"
+    e  <- expr
+    return (Dim d ts e)
 
 bind :: ReadCC a => Parser (CC a)
 bind = do
@@ -100,18 +115,3 @@ bind = do
 
 ref :: Parser (CC a)
 ref = var >>= return . Ref
-
-dim :: ReadCC a => Parser (CC a)
-dim = do 
-    reserved "dim"
-    d  <- identifier
-    ts <- angles (list identifier)
-    reserved "in"
-    e  <- expr
-    return (Dim d ts e)
-
-choice :: ReadCC a => Parser (CC a)
-choice = do
-    d  <- identifier
-    as <- angles (list expr)
-    return (Chc d as)

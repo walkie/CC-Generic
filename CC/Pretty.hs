@@ -76,12 +76,12 @@ bracks = surround op     "<" ">"
 parens = surround op     "(" ")"
 
 cc :: ShowCC a => CC a -> Pretty String
-cc (Str a [])  = val a
-cc (Str a es)  = cat [val a, (braces . commas return) (map cc es)]
-cc (Let v b u) = cat [key "let ", var v, op " = ", parens (cc b), key " in ", parens (cc u)]
-cc (Ref v)     = var v
-cc (Dim d t e) = cat [key "dim ", dim d, (bracks . commas op) (map tag t), key " in ", parens (cc e)]
-cc (Chc d es)  = cat [dim d, (bracks . commas op) (map cc es)]
+cc (Str a :< []) = val a
+cc (Str a :< es) = cat [val a, (braces . commas return) (map cc es)]
+cc (Chc d :< es) = cat [dim d, (bracks . commas op) (map cc es)]
+cc (Dim d t e)   = cat [key "dim ", dim d, (bracks . commas op) (map tag t), key " in ", parens (cc e)]
+cc (Let v b u)   = cat [key "let ", var v, op " = ", parens (cc b), key " in ", parens (cc u)]
+cc (Ref v)       = var v
 
 
 --------------------------------------

@@ -24,9 +24,9 @@ boundVars e           = S.unions (mapSubs boundVars e)
 
 -- set of free dimensions
 freeDims :: CC a -> Set Dim
-freeDims (Dim d _ e) = S.delete d (freeDims e)
-freeDims (Chc d es)  = S.insert d (S.unions (map freeDims es))
-freeDims e           = S.unions (mapSubs freeDims e)
+freeDims (Dim d _ e)   = S.delete d (freeDims e)
+freeDims (Chc d :< es) = S.insert d (S.unions (map freeDims es))
+freeDims e             = S.unions (mapSubs freeDims e)
 
 -- set of free variables
 freeVars :: CC a -> Set Var
@@ -70,8 +70,8 @@ dimFree e           = all dimFree (subs e)
 
 -- is the expression choice free?
 choiceFree :: CC a -> Bool
-choiceFree (Chc _ _) = False
-choiceFree e         = all choiceFree (subs e)
+choiceFree (Chc _ :< _) = False
+choiceFree e            = all choiceFree (subs e)
 
 -- is the expression sharing free?
 shareFree :: CC a -> Bool
@@ -94,8 +94,8 @@ plain e = variationFree e && shareFree e
 wellDim :: CC a -> Bool
 wellDim = well []
   where well :: [(Dim,Int)] -> CC a -> Bool
-        well m (Dim d ts e) = well ((d,length ts):m) e
-        well m (Chc d es) = case lookup d m of
-                              Just n    -> length es == n && all (well m) es
-                              otherwise -> False
+        well m (Dim d ts e)  = well ((d,length ts):m) e
+        well m (Chc d :< es) = case lookup d m of
+                                 Just n    -> length es == n && all (well m) es
+                                 otherwise -> False
         well m e = all (well m) (subs e)
