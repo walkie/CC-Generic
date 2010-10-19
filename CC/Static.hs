@@ -86,9 +86,9 @@ plain :: CC a -> Bool
 plain e = variationFree e && shareFree e
 
 
---------------------------
--- Well Dimensionedness --
---------------------------
+---------------------
+-- Well Formedness --
+---------------------
 
 -- is the expression well dimensioned?
 wellDim :: CC a -> Bool
@@ -99,3 +99,7 @@ wellDim = well []
                                  Just n    -> length es == n && all (well m) es
                                  otherwise -> False
         well m e = all (well m) (subs e)
+
+-- is the expression well formed?
+wellFormed :: CC a -> Bool
+wellFormed e = S.null (freeVars e) && wellDim e
