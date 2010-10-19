@@ -85,3 +85,15 @@ case_list_rightEnd = testListLocs rightEnd [True,True,False,True,False]
 case_list_left     = testListLocs left     [empty,single,lempty,(ListCtx [1,0] [3],Just 2),(ListCtx [1,0] [3,4,5,6],Just 2)]
 case_list_right    = testListLocs right    [empty,single,(ListCtx [0] [2,3],Just 1),rempty,(ListCtx [3,2,1,0] [5,6],Just 4)]
 
+inSub 0 ([], Str 0 :< [leaf i | i <- [1..5]]) :: Maybe (Location Int)
+Just ([InB (Str 0) [] [2,3,4,5]],1)
+*CC.Zipper> inSub 1 ([], Str 0 :< [leaf i | i <- [1..5]]) :: Maybe (Location Int)
+Just ([InB (Str 0) [1] [3,4,5]],2)
+*CC.Zipper> inSub 3 ([], Str 0 :< [leaf i | i <- [1..5]]) :: Maybe (Location Int)
+Just ([InB (Str 0) [3,2,1] [5]],4)
+*CC.Zipper> inSub 5 ([], Str 0 :< [leaf i | i <- [1..5]]) :: Maybe (Location Int)
+Nothing
+*CC.Zipper> inSub 4 ([], Str 0 :< [leaf i | i <- [1..5]]) :: Maybe (Location Int)
+Just ([InB (Str 0) [4,3,2,1] []],5)
+*CC.Zipper> inSub (-1) ([], Str 0 :< [leaf i | i <- [1..5]]) :: Maybe (Location Int)
+Nothing

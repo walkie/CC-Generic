@@ -7,6 +7,7 @@ import CC.Semantics
 exprs :: [CC Int]
 exprs = [b1,b2,b3,
          s1,s2,s3,
+         s1',s2',s3',
          v1,v2,v3,v4,v5,v6,v7]
 
 -- 
