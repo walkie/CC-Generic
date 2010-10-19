@@ -44,7 +44,7 @@ decide d e = foldl (\m q -> m >>= selectTag q) (Just e) d
 ------------------------
 
 type Map k v = [(k,v)]
-type Semantics a = Map Decision (CC a)
+type Semantics a = Map Decision a
 
 -- Let expansion.  This transformation should only be applied to dimension-free
 -- expressions, otherwise the semantics will be changed.
@@ -55,7 +55,7 @@ letExp m e           = transformSubs (letExp m) e
 
 -- The variants of a choice calculus expression.  Removes all dimensions.
 -- Removes all choices if well-dimensioned.
-variants :: CC a -> Semantics a
+variants :: CC a -> Semantics (CC a)
 variants (Dim d ts e) = do
     (t,i)   <- zip ts [0..]
     (qs,e') <- variants (fromJust (choiceElim (d,i) e))
@@ -68,5 +68,5 @@ variants e | null (subs e) = [([],e)]
         cross (v:vs) = [(qs++rs, e:es) | (qs,e) <- v, (rs,es) <- cross vs]
 
 -- If well-formed, provides a mapping from decisions to plain expressions.
-semantics :: CC a -> Semantics a
+semantics :: CC a -> Semantics (CC a)
 semantics e = [(qs, letExp [] e') | (qs,e') <- variants e]
