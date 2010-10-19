@@ -55,7 +55,7 @@ type Move a = Location a -> Maybe (Location a)
 
 -- execute a move from the top of an expression and return the final location
 goto :: Move a -> CC a -> Maybe (Location a)
-goto m c = m (enter c)
+goto m e = m (enter e)
 
 -- 
 -- generic moves
@@ -119,7 +119,7 @@ leftEnd  = isNothing . left
 rightEnd = isNothing . right
 
 -- find a matching location using a preorder traversal
-match :: (CC a -> Bool) -> Location a -> Maybe (Location a)
+match :: (CC a -> Bool) -> Move a
 match f l | f (snd l) = Just l
           | otherwise = case down l >>= match f of
                           Nothing -> tryRight
