@@ -1,103 +1,72 @@
-{-# LANGUAGE PatternGuards #-}
+module CC.Semantics where
 
-module Choice.Semantics where
+import Control.Monad (guard)
+import Data.List (elemIndex)
+import Data.Maybe (fromMaybe,fromJust)
 
-import Data.List  (elemIndex,nub)
-import Data.Maybe (fromMaybe)
-
-import Choice.Syntax
-import Choice.Static
-import Choice.Util
-
-
------------
--- Types --
------------
-
-type Selector      = QTag Int
-type Semantics t a = [(Decision t, Expr t a)]
-type Context t a   = Expr t a -> Expr t a
-type Match t a     = Maybe (Context t a, Expr t a)
-
+import CC.Syntax
+import CC.Zipper
 
 ---------------
 -- Selection --
 ---------------
 
-decide :: Eq t => Decision t -> Expr t a -> Maybe (Expr t a)
-decide d e = foldMaybe select (Just e) d
+type QTag     = (Dim,Tag)
+type Selector = (Dim,Int)
+type Decision = [QTag]
 
-select :: Eq t => QTag t -> Expr t a -> Maybe (Expr t a)
-select (d,t) e | Just (c, (Dim (_ := ts) e')) <- match decl e
-               , Just i                       <- elemIndex t ts
-               = (Just . c . selectIx (d,i)) e'
-               | otherwise = Nothing
-  where decl (Dim (d' := _) _) = d == d'
-        decl _                 = False
+-- Tag selection. Given qualified tag d.t, select tag t in the first
+-- dimension d encountered in an inorder traversal of the choice expression.
+selectTag :: QTag -> CC a -> Maybe (CC a)
+selectTag (d,t) e = do 
+    (c, Dim _ ts e') <- goto (match dim) e
+    i                <- elemIndex t ts
+    e''              <- choiceElim (d,i) e'
+    return (exit (c,e''))
+  where dim (Dim d' _ _) = d == d'
+        dim _            = False
 
-selectIx :: Selector -> Expr t a -> Expr t a
-selectIx (d,i) (d' :? es)          | d == d' = selectIx (d,i) (es !! i)
-selectIx (d,i) e@(Dim (d' := _) _) | d == d' = e
-selectIx s e = tcmap (selectIx s) e
+-- Choice elimination Given selector d.i, replace all choices in dimension d
+-- with their ith alternative. Used in tag selection and the choice semantics.
+choiceElim :: Selector -> CC a -> Maybe (CC a)
+choiceElim (d,_) e@(Dim d' _ _) | d == d' = return e
+choiceElim (d,i) (Chc d' :< es) | d == d' = do guard (i < length es)
+                                               choiceElim (d,i) (es !! i)
+choiceElim s e = transformSubsM (choiceElim s) e
 
--- match a context
-match :: (Expr t a -> Bool) -> Expr t a -> Match t a
-match f = m id
-  where 
-    m c e | f e           = Just (c,e)
-    m c (Var v)           = Nothing
-    m c (a :< es)         = leftMost f (c . (a:<)) es
-    m c (Let (v := a) b)  = firstJust [m (\e -> c (Let (v := e) b)) a,
-                                       m (c . Let (v := a)) b]
-    m c (Dim (d := ts) a) = m (\e -> c (Dim (d := ts) e)) a
-    m c (d :? es)         = leftMost f (c . (d:?)) es
-        
-    leftMost f c' es = firstJust [m (\e -> c' (replace i es e)) (es !! i)
-                                 | i <- [0..length es-1]]
+-- Make a decision by applying each selection in order.
+decide :: Decision -> CC a -> Maybe (CC a)
+decide d e = foldl (\m q -> m >>= selectTag q) (Just e) d
 
 
-----------------------
--- Choice Semantics --
-----------------------
+------------------------
+-- Decision Semantics --
+------------------------
 
--- all decisions excluding non-significant reorderings (needs to be tested)
-decs :: Eq t => Dims t -> Expr t a -> [Decision t]
-decs m (Dim (d := ts) e) = concatMap fix xs
-  where xs = decs ((d,ts):m) e
-        -- pick arbitrary tags if we haven't eliminated this dimension
-        fix x = if elem d (map fst x) then [x] else [(d,t):x | t <- ts]
-decs m (d :? es) | Just ts <- lookup d m = concat $ zipWith3 branch ts es [0..]
-        -- select t in alternative to prevent duplicate entries in the decision
-  where branch t e i = [(d,t):x | x <- decs m (selectIx (d,i) e)]
-decs m e = if null xs then [[]] else xs
-  where xs = (nub . concat . map (decs m) . children) e
+type Map k v = [(k,v)]
+type Semantics a = Map Decision (CC a)
 
--- eliminate let expressions
-expand :: Map (Expr t a) -> Expr t a -> Expr t a
-expand m e@(Var v)         = fromMaybe e (lookup v m)
-expand m (Let (v := e) e') = expand ((v,expand m e):m) e'
-expand m e                 = tcmap (expand m) e
+-- Let expansion.  This transformation should only be applied to dimension-free
+-- expressions, otherwise the semantics will be changed.
+letExp :: Map Var (CC a) -> CC a -> CC a
+letExp m (Let v b u) = letExp ((v, letExp m b):m) u
+letExp m e@(Ref v)   = fromMaybe e (lookup v m)
+letExp m e           = transformSubs (letExp m) e
 
--- eliminate all let expressions and variables
-makeShareFree :: Expr t a -> Maybe (Expr t a)
-makeShareFree e | shareFree e' = Just e'
-                | otherwise    = Nothing
-  where e' = expand [] e
+-- The variants of a choice calculus expression.  Removes all dimensions.
+-- Removes all choices if well-dimensioned.
+variants :: CC a -> Semantics a
+variants (Dim d ts e) = do
+    (t,i)   <- zip ts [0..]
+    (qs,e') <- variants (fromJust (choiceElim (d,i) e))
+    return ((d,t):qs, e')
+variants e | null (subs e) = [([],e)]
+           | otherwise     = [(qs, replaceSubs e es) | (qs,es) <- product e]
+  where product = cross . mapSubs variants
+        cross []     = []
+        cross [v]    = [(qs    , [e])  | (qs,e) <- v]
+        cross (v:vs) = [(qs++rs, e:es) | (qs,e) <- v, (rs,es) <- cross vs]
 
--- decisions to variation free expressions
-variants :: Eq t => Expr t a -> Semantics t a
-variants e = map entry (decs [] e)
-  where entry d | Just e' <- decide d e = (d,e')
-
--- decisions to plain expressions
-semantics :: Eq t => Expr t a -> Semantics t a
-semantics e = map entry (variants e)
-  where entry (d,e) | Just e' <- makeShareFree e = (d,e')
-
-
-bug  = dim "A" [True,False]
-     $ dim "B" [True,False]
-     $ "A" :? ["B" :? [leaf 1,leaf 2], leaf 3]
-
-bug' = dim "A" [True,False]
-     $ "A" :? [dim "B" [True,False] ("B" :? [leaf 1,leaf 2]), leaf 3]
+-- If well-formed, provides a mapping from decisions to plain expressions.
+semantics :: CC a -> Semantics a
+semantics e = [(qs, letExp [] e') | (qs,e') <- variants e]
