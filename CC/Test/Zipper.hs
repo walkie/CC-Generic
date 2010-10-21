@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances, TemplateHaskell, ScopedTypeVariables #-}
-module CC.Test.Context where
+module CC.Test.Zipper where
 
 import Debug.Trace
 
@@ -10,23 +10,16 @@ import Test.Framework.Providers.QuickCheck2 -- requires QuickCheck-2.1.1.1
 import Test.HUnit
 import Test.QuickCheck
 
-import CC.Context
+import CC.Syntax
+import CC.Zipper
+import CC.Test.Gen
 
 ----------------
 -- Invariants --
 ----------------
 
--- arbitrary navigables
-enterExit l = l == (exit . enter) l
-leftRight l = leftEnd  l || l == (right . left ) l
-rightLeft l = rightEnd l || l == (left  . right) l
-upDown l = top    l || l == (down . up  ) l
-downUp l = bottom l || l == (up   . down) l
-
--- lists
-focusExit i l = l == (exit . focus i) l
-focusGetFocus i l = getFocus (focus i l) == boundedIx i l
-
+prop_enterExit e = e == (exit . enter) e
+  where types = e :: CC Int
 
 -----------------------
 -- "Automated" Tests --
@@ -38,6 +31,20 @@ runTests = defaultMain tests
 --
 -- QuickCheck
 --
+
+
+{-
+-- arbitrary navigables
+enterExit l = l == (exit . enter) l
+leftRight l = leftEnd  l || l == (right . left ) l
+rightLeft l = rightEnd l || l == (left  . right) l
+upDown l = top    l || l == (down . up  ) l
+downUp l = bottom l || l == (up   . down) l
+
+-- lists
+focusExit i l = l == (exit . focus i) l
+focusGetFocus i l = getFocus (focus i l) == boundedIx i l
+
 
 prop_list_focusExit i l = focusExit i l
   where types = l :: [Int]
@@ -97,3 +104,4 @@ Nothing
 Just ([InB (Str 0) [4,3,2,1] []],5)
 *CC.Zipper> inSub (-1) ([], Str 0 :< [leaf i | i <- [1..5]]) :: Maybe (Location Int)
 Nothing
+-}
