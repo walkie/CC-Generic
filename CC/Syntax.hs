@@ -2,6 +2,7 @@
 module CC.Syntax where 
 
 import Data.Generics
+import Data.Set (Set,empty,unions)
 
 ------------
 -- Syntax --
@@ -13,90 +14,56 @@ type Tag = Name
 type Var = Name
 
 -- choice calculus expressions
-data CC a =
-    CCB a :< [CC a]       -- branching
-  | Dim Dim [Tag]  (CC a) -- dimension declaration
-  | Let Var (CC a) (CC a) -- variable binding
+data CC e =
+    Exp e                 -- subexpressions
+  | Dim Dim [Tag] (CC e)  -- dimension declaration
+  | Chc Dim [CC e]        -- choice branching
+  | Let Var (CC e) (CC e) -- variable binding
   | Ref Var               -- variable reference
-  deriving (Eq,Data,Typeable)
-
--- choice calculus branch type
-data CCB a = Str a   -- structural branching
-           | Chc Dim -- choice branching
   deriving (Eq,Show,Data,Typeable)
+
 
 ----------------------
 -- Useful Functions --
 ----------------------
 
--- smart constructor for structure nodes
-str :: a -> [CC a] -> CC a
-str a es = Str a :< es
-
--- smart constructor for choice nodes
-chc :: Dim -> [CC a] -> CC a
-chc d es = Chc d :< es
-
--- smart constructor for leaf nodes
-leaf :: a -> CC a
-leaf a = str a []
-
 -- true if the top node is of the corresponding syntactic type
-isStr, isLet, isRef, isDim, isChc :: CC a -> Bool
-isStr (Str _ :< _) = True
-isStr _            = False
-isChc (Chc _ :< _) = True
-isChc _            = False
-isDim (Dim _ _ _)  = True
-isDim _            = False
-isLet (Let _ _ _)  = True
-isLet _            = False
-isRef (Ref _)      = True
-isRef _            = False
+isExp, isDim, isChc, isLet, isRef :: CC a -> Bool
+isExp (Exp _)     = True
+isExp _           = False
+isDim (Dim _ _ _) = True
+isDim _           = False
+isChc (Chc _ _)   = True
+isChc _           = False
+isLet (Let _ _ _) = True
+isLet _           = False
+isRef (Ref _)     = True
+isRef _           = False
 
--- true if this is a leaf node
-isLeaf :: CC a -> Bool
-isLeaf (_ :< []) = True
-isLeaf (Ref _)   = True
-isLeaf _         = False
+-- Apply a function to every immediate choice calculus subexpression of an
+-- expression and collect the results.
+ccMap :: Data e => b -> (CC e -> b) -> CC e -> [b]
+ccMap d f (Exp e)     = gmapQ (mkQ d f) e
+ccMap _ f (Dim _ _ e) = [f e]
+ccMap _ f (Chc _ es)  = map f es
+ccMap _ f (Let _ b u) = [f b,f u]
+ccMap d _ (Ref _)     = [d]
 
--- immediate subexpressions of an expression
-subs :: CC a -> [CC a]
-subs (_ :< es)   = es
-subs (Dim _ _ e) = [e]
-subs (Let _ b e) = [b,e]
-subs (Ref _)     = []
+-- A list-specific version of ccMap.
+ccConcatMap :: Data e => (CC e -> [b]) -> CC e -> [b]
+ccConcatMap f = concat . ccMap [] f
 
--- replace an expression's subexpressions
-replaceSubs :: CC a -> [CC a] -> CC a
-replaceSubs (b :< _)    es    = b :< es
-replaceSubs (Dim d t _) [e]   = Dim d t e
-replaceSubs (Let v _ _) [b,e] = Let v b e
-replaceSubs r@(Ref _)   []    = r
+-- A set-specific version of ccMap.
+ccUnionsMap :: (Data e, Ord b) => (CC e -> Set b) -> CC e -> Set b
+ccUnionsMap f = unions . ccMap empty f
 
--- map a function across an expression's subexpressions
-mapSubs :: (CC a -> b) -> CC a -> [b]
-mapSubs f = map f . subs
+-- A boolean-AND-specific version of ccMap.
+ccAll :: Data e => (CC e -> Bool) -> CC e -> Bool
+ccAll f = and . ccMap True f
 
--- transform an expression's subexpressions
-transformSubs :: (CC a -> CC a) -> CC a -> CC a
-transformSubs f e = replaceSubs e (mapSubs f e)
+-- A boolean-OR-specific version of ccMap.
+ccAny :: Data e => (CC e -> Bool) -> CC e -> Bool
+ccAny f = or . ccMap False f
 
--- monadic version of transformSubs
-transformSubsM :: Monad m => (CC a -> m (CC a)) -> CC a -> m (CC a)
-transformSubsM f e = sequence (mapSubs f e) >>= return . replaceSubs e
-
-
----------------
--- Instances --
----------------
-
-instance Functor CC where
-  fmap f (b :< es)   = fmap f b :< (map (fmap f) es)
-  fmap f (Dim d t e) = Dim d t (fmap f e)
-  fmap f (Let v b e) = Let v (fmap f b) (fmap f e)
-  fmap _ (Ref v)     = Ref v
-
-instance Functor CCB where
-  fmap f (Str a) = Str (f a)
-  fmap _ (Chc d) = Chc d
+--ccTransform :: Data e => (CC e -> CC e) -> CC e -> CC e
+--ccTransform 

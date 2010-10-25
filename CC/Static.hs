@@ -1,5 +1,7 @@
 module CC.Static where
 
+import Data.Generics
+
 import Data.List  (find)
 import Data.Maybe (fromJust)
 import Data.Set   (Set)
@@ -13,26 +15,26 @@ import CC.Syntax
 --------------------------
 
 -- set of bound dimensions
-boundDims :: CC a -> Set Dim
+boundDims :: Data e => CC e -> Set Dim
 boundDims (Dim d _ e) = S.insert d (boundDims e)
-boundDims e           = S.unions (mapSubs boundDims e)
+boundDims e           = ccUnionsMap boundDims e
 
 -- set of bound variables
-boundVars :: CC a -> Set Var
+boundVars :: Data e => CC e -> Set Var
 boundVars (Let v b e) = S.insert v (boundVars b `S.union` boundVars e)
-boundVars e           = S.unions (mapSubs boundVars e)
+boundVars e           = ccUnionsMap boundVars e
 
 -- set of free dimensions
-freeDims :: CC a -> Set Dim
-freeDims (Dim d _ e)   = S.delete d (freeDims e)
-freeDims (Chc d :< es) = S.insert d (S.unions (map freeDims es))
-freeDims e             = S.unions (mapSubs freeDims e)
+freeDims :: Data e => CC e -> Set Dim
+freeDims (Dim d _ e) = S.delete d (freeDims e)
+freeDims (Chc d es)  = S.insert d (S.unions (map freeDims es))
+freeDims e           = ccUnionsMap freeDims e
 
 -- set of free variables
-freeVars :: CC a -> Set Var
+freeVars :: Data e => CC e -> Set Var
 freeVars (Let v b e) = S.delete v (freeVars e) `S.union` freeVars b
 freeVars (Ref v)     = S.singleton v
-freeVars e           = S.unions (mapSubs freeVars e)
+freeVars e           = ccUnionsMap freeVars e
 
 -- generate an unused name given a seed name, used names are given in a set
 safeName :: Name -> Set Name -> Name
@@ -40,12 +42,12 @@ safeName n s = fromJust $ find (flip S.notMember s) [n ++ show i | i <- [1..]]
 
 -- generate a variable name from a seed that won't capture any free variables
 -- in the given expression
-safeVar :: Var -> CC a -> Var
+safeVar :: Data e => Var -> CC e -> Var
 safeVar v = safeName v . freeVars
 
 -- generate a dimension name from a seed that won't capture any free dimensions
 -- in the given expression
-safeDim :: Dim -> CC a -> Dim
+safeDim :: Data e => Dim -> CC e -> Dim
 safeDim d = safeName d . freeDims
 
 
@@ -54,35 +56,35 @@ safeDim d = safeName d . freeDims
 --------------------------
 
 -- is the expression binding free?
-bindFree :: CC a -> Bool
+bindFree :: Data e => CC e -> Bool
 bindFree (Let _ _ _) = False
-bindFree e           = all bindFree (subs e)
+bindFree e           = ccAll bindFree e
 
 -- is the expression reference free?
-refFree :: CC a -> Bool
+refFree :: Data e => CC e -> Bool
 refFree (Ref _) = False
-refFree e       = all refFree (subs e)
+refFree e       = ccAll refFree e
 
 -- is the expression dimension free?
-dimFree :: CC a -> Bool
+dimFree :: Data e => CC e -> Bool
 dimFree (Dim _ _ _) = False
-dimFree e           = all dimFree (subs e)
+dimFree e           = ccAll dimFree e
 
 -- is the expression choice free?
-choiceFree :: CC a -> Bool
-choiceFree (Chc _ :< _) = False
-choiceFree e            = all choiceFree (subs e)
+choiceFree :: Data e => CC e -> Bool
+choiceFree (Chc _ _) = False
+choiceFree e         = ccAll choiceFree e
 
 -- is the expression sharing free?
-shareFree :: CC a -> Bool
+shareFree :: Data e => CC e -> Bool
 shareFree e = bindFree e && refFree e
 
 -- is the expression variation free?
-variationFree :: CC a -> Bool
+variationFree :: Data e => CC e -> Bool
 variationFree e = dimFree e && choiceFree e
 
 -- is the expression plain?
-plain :: CC a -> Bool
+plain :: Data e => CC e -> Bool
 plain e = variationFree e && shareFree e
 
 
@@ -91,15 +93,15 @@ plain e = variationFree e && shareFree e
 ---------------------
 
 -- is the expression well dimensioned?
-wellDim :: CC a -> Bool
+wellDim :: Data e => CC e -> Bool
 wellDim = well []
-  where well :: [(Dim,Int)] -> CC a -> Bool
-        well m (Dim d ts e)  = well ((d,length ts):m) e
-        well m (Chc d :< es) = case lookup d m of
-                                 Just n    -> length es == n && all (well m) es
+  where well :: Data e => [(Dim,Int)] -> CC e -> Bool
+        well m (Dim d ts e) = well ((d,length ts):m) e
+        well m (Chc d es)   = case lookup d m of
+                                 Just n    -> length es == n && all (ccAll (well m)) es
                                  otherwise -> False
-        well m e = all (well m) (subs e)
+        well m e = ccAll (well m) e
 
 -- is the expression well formed?
-wellFormed :: CC a -> Bool
+wellFormed :: Data e => CC e -> Bool
 wellFormed e = S.null (freeVars e) && wellDim e
