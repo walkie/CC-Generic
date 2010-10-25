@@ -42,7 +42,7 @@ isRef _           = False
 
 -- Apply a function to every immediate choice calculus subexpression of an
 -- expression and collect the results.
-ccMap :: Data e => b -> (CC e -> b) -> CC e -> [b]
+ccMap :: Data e => r -> (CC e -> r) -> CC e -> [r]
 ccMap d f (Exp e)     = gmapQ (mkQ d f) e
 ccMap _ f (Dim _ _ e) = [f e]
 ccMap _ f (Chc _ es)  = map f es
@@ -50,11 +50,11 @@ ccMap _ f (Let _ b u) = [f b,f u]
 ccMap d _ (Ref _)     = [d]
 
 -- A list-specific version of ccMap.
-ccConcatMap :: Data e => (CC e -> [b]) -> CC e -> [b]
+ccConcatMap :: Data e => (CC e -> [r]) -> CC e -> [r]
 ccConcatMap f = concat . ccMap [] f
 
 -- A set-specific version of ccMap.
-ccUnionsMap :: (Data e, Ord b) => (CC e -> Set b) -> CC e -> Set b
+ccUnionsMap :: (Data e, Ord r) => (CC e -> Set r) -> CC e -> Set r
 ccUnionsMap f = unions . ccMap empty f
 
 -- A boolean-AND-specific version of ccMap.
