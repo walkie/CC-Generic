@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, RankNTypes #-}
+{-# LANGUAGE DeriveDataTypeable, Rank2Types #-}
 module CC.Syntax where 
 
 import Data.Generics
@@ -55,8 +55,8 @@ ccAll f = and . ccMap True f
 ccAny :: ExpT e => (forall f. ExpT f => CC f -> Bool) -> CC e -> Bool
 ccAny f = or . ccMap False f
 
--- true if the top node is of the corresponding syntactic type
-isExp, isDim, isChc, isLet, isRef :: CC a -> Bool
+-- true if the top node is of the corresponding syntactic category
+isExp, isDim, isChc, isLet, isRef :: CC e -> Bool
 isExp (Exp _)     = True
 isExp _           = False
 isDim (Dim _ _ _) = True
@@ -67,4 +67,3 @@ isLet (Let _ _ _) = True
 isLet _           = False
 isRef (Ref _)     = True
 isRef _           = False
-
