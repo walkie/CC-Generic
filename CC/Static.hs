@@ -10,8 +10,6 @@ import qualified Data.Set as S
 
 import CC.Syntax
 
-data FunBox r = forall e. ExpT e => FunBox { unBox :: CC e -> r }
-
 --------------------------
 -- Free and Bound Names --
 --------------------------
