@@ -41,23 +41,26 @@ data List t deriving Typeable
 -- type-level left-associative cons
 data l :> t deriving Typeable
 
--- build queries and transformations based on type-level lists of subexpression types
+-- build queries and ccTformations based on type-level lists of subexpression types
 class Typeable t => TypeList t where
-  query' :: t -> r -> (forall u. ExpT u => CC u -> r) -> (forall d. Data d => d -> r)
+  ccQ' :: t -> r -> (forall u. ExpT u => CC u -> r)    -> (forall d. Data d => d -> r)
+  ccT' :: t ->      (forall u. ExpT u => CC u -> CC u) -> (forall d. Data d => d -> d)
 
-instance (ExpT t, Typeable t) => TypeList (List t) where
-  query' _ d f = mkQ d (asTypeOf f x)
-    where x = undefined :: CC t -> r
+instance ExpT t => TypeList (List t) where
+  ccQ' _ d f = mkQ d (asTypeOf f (undefined :: CC t -> r   ))
+  ccT' _   f = mkT   (asTypeOf f (undefined :: CC t -> CC t))
 
-instance (ExpT t, TypeList l, Typeable t) => TypeList (l :> t) where
-  query' _ d f = query' (undefined :: l) d f `extQ` asTypeOf f x
-    where x = undefined :: CC t -> r
+instance (ExpT t, TypeList l) => TypeList (l :> t) where
+  ccQ' _ d f = ccQ' (undefined :: l) d f `extQ` asTypeOf f (undefined :: CC t -> r   )
+  ccT' _   f = ccT' (undefined :: l)   f `extT` asTypeOf f (undefined :: CC t -> CC t)
 
 -- Subexpression type class, should only need to instantiate the SubExps type.
 class (Data e, TypeList (SubExps e)) => ExpT e where
   type SubExps e
-  query :: e -> r -> (forall f. ExpT f => CC f -> r) -> (forall d. Data d => d -> r)
-  query _ r f = query' (undefined :: SubExps e) r f
+  ccQ :: e -> r -> (forall f. ExpT f => CC f -> r)    -> (forall d. Data d => d -> r)
+  ccT :: e ->      (forall f. ExpT f => CC f -> CC f) -> (forall d. Data d => d -> d)
+  ccQ _ r f = ccQ' (undefined :: SubExps e) r f
+  ccT _   f = ccT' (undefined :: SubExps e)   f
 
 
 -----------------------
@@ -67,7 +70,7 @@ class (Data e, TypeList (SubExps e)) => ExpT e where
 -- Apply a function to every immediate choice calculus subexpression of an
 -- expression and collect the results.
 ccMap :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CC e -> [r]
-ccMap d f (Exp e)     = gmapQ (query e d f) e
+ccMap d f (Exp e)     = gmapQ (ccQ e d f) e
 ccMap _ f (Dim _ _ e) = [f e]
 ccMap _ f (Chc _ es)  = map f es
 ccMap _ f (Let _ b u) = [f b, f u]

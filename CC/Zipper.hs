@@ -31,7 +31,7 @@ getHole = Z.getHole
 
 -- apply a query to the choice calculus expression at the current hole
 queryCC :: ExpT e => r -> (forall f. CC f -> r) -> Zipper e -> r
-queryCC d f z = maybe d (query (unXCC z) d f) (getHole z)
+queryCC d f z = maybe d (ccQ (unXCC z) d f) (getHole z)
 
 -- boolean version of queryCC, asking am I at a location that satisfies the query?
 atCC :: ExpT e => (forall f. CC f -> Bool) -> Zipper e -> Bool
