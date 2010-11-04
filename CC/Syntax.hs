@@ -1,8 +1,16 @@
-{-# LANGUAGE DeriveDataTypeable, Rank2Types #-}
+{-# LANGUAGE
+      DeriveDataTypeable,
+      EmptyDataDecls,
+      FlexibleContexts,
+      Rank2Types,
+      ScopedTypeVariables,
+      TypeFamilies,
+      TypeOperators #-}
 module CC.Syntax where 
 
 import Data.Generics
 import Data.Set (Set,empty,unions)
+
 
 ------------
 -- Syntax --
@@ -22,18 +30,52 @@ data CC e =
   | Ref Var               -- variable reference
   deriving (Eq,Show,Data,Typeable)
 
-class Data e => ExpT e where
-  extQs :: e -> r -> (forall f. ExpT f => CC f -> r) -> (forall d. Data d => d -> r)
+
+-----------------------------
+-- Handling Subexpressions --
+-----------------------------
+
+-- type-level singleton list
+data List t deriving Typeable
+
+-- type-level left-associative cons
+data l :> t deriving Typeable
+
+-- build queries and transformations based on type-level lists of subexpression types
+class Typeable t => TypeList t where
+  query' :: t -> r -> (forall u. ExpT u => CC u -> r) -> (forall d. Data d => d -> r)
+
+instance (ExpT t, Typeable t) => TypeList (List t) where
+  query' _ d f = mkQ d (asTypeOf f x)
+    where x = undefined :: CC t -> r
+
+instance (ExpT t, TypeList l, Typeable t) => TypeList (l :> t) where
+  query' _ d f = query' (undefined :: l) d f `extQ` asTypeOf f x
+    where x = undefined :: CC t -> r
+
+-- Subexpression type class, should only need to instantiate the SubExps type.
+class (Data e, TypeList (SubExps e)) => ExpT e where
+  type SubExps e
+  query :: e -> r -> (forall f. ExpT f => CC f -> r) -> (forall d. Data d => d -> r)
+  query _ r f = query' (undefined :: SubExps e) r f
 
 
 ----------------------
 -- Useful Functions --
 ----------------------
 
+-- for manipulating types only
+unCC :: CC e -> e
+unCC = error "unCC was evaluated..."
+
+-- for manipulating types only
+unXCC :: x (CC e) -> e
+unXCC = error "unXCC was evaluated..."
+
 -- Apply a function to every immediate choice calculus subexpression of an
 -- expression and collect the results.
 ccMap :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CC e -> [r]
-ccMap d f (Exp e)     = gmapQ (extQs e d f) e
+ccMap d f (Exp e)     = gmapQ (query e d f) e
 ccMap _ f (Dim _ _ e) = [f e]
 ccMap _ f (Chc _ es)  = map f es
 ccMap _ f (Let _ b u) = [f b, f u]
