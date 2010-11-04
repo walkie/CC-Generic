@@ -60,17 +60,9 @@ class (Data e, TypeList (SubExps e)) => ExpT e where
   query _ r f = query' (undefined :: SubExps e) r f
 
 
-----------------------
--- Useful Functions --
-----------------------
-
--- for manipulating types only
-unCC :: CC e -> e
-unCC = error "unCC was evaluated..."
-
--- for manipulating types only
-unXCC :: x (CC e) -> e
-unXCC = error "unXCC was evaluated..."
+-----------------------
+-- Generic Functions --
+-----------------------
 
 -- Apply a function to every immediate choice calculus subexpression of an
 -- expression and collect the results.
@@ -97,6 +89,19 @@ ccAll f = and . ccMap True f
 ccAny :: ExpT e => (forall f. ExpT f => CC f -> Bool) -> CC e -> Bool
 ccAny f = or . ccMap False f
 
+
+----------------------------
+-- Other Useful Functions --
+----------------------------
+
+-- for manipulating types only
+unCC :: CC e -> e
+unCC = error "unCC was evaluated..."
+
+-- for manipulating types only
+unXCC :: x (CC e) -> e
+unXCC = error "unXCC was evaluated..."
+
 -- true if the top node is of the corresponding syntactic category
 isExp, isDim, isChc, isLet, isRef :: CC e -> Bool
 isExp (Exp _)     = True
@@ -109,3 +114,20 @@ isLet (Let _ _ _) = True
 isLet _           = False
 isRef (Ref _)     = True
 isRef _           = False
+
+-- get the dimension name at this node, if applicable
+getDim :: CC e -> Maybe Dim
+getDim (Dim d _ _) = Just d
+getDim (Chc d _)   = Just d
+getDim _           = Nothing
+
+-- get the tag list at this node, if applicable
+getTags :: CC e -> Maybe [Tag]
+getTags (Dim _ ts _) = Just ts
+getTags _            = Nothing
+
+-- get the variable name at this node, if applicable
+getVar :: CC e -> Maybe Var
+getVar (Let v _ _) = Just v
+getVar (Ref v)     = Just v
+getVar _           = Nothing
