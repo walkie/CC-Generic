@@ -1,6 +1,7 @@
 {-# LANGUAGE
       DeriveDataTypeable,
       EmptyDataDecls,
+      ExistentialQuantification,
       FlexibleContexts,
       Rank2Types,
       ScopedTypeVariables,
@@ -26,9 +27,12 @@ data CC e =
     Exp e                 -- subexpressions
   | Dim Dim [Tag] (CC e)  -- dimension declaration
   | Chc Dim [CC e]        -- choice branching
-  | Let Var (CC e) (CC e) -- variable binding
+  | Let Var Bound (CC e)  -- variable binding
   | Ref Var               -- variable reference
-  deriving (Eq,Show,Data,Typeable)
+  deriving Typeable
+
+data Bound = forall e. ExpT e => Bnd (CC e)
+  deriving Typeable
 
 
 -----------------------------
@@ -70,11 +74,11 @@ class (Data e, TypeList (SubExps e)) => ExpT e where
 -- Apply a function to every immediate choice calculus subexpression of an
 -- expression and collect the results.
 ccMap :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CC e -> [r]
-ccMap d f (Exp e)     = gmapQ (ccQ e d f) e
-ccMap _ f (Dim _ _ e) = [f e]
-ccMap _ f (Chc _ es)  = map f es
-ccMap _ f (Let _ b u) = [f b, f u]
-ccMap d _ (Ref _)     = [d]
+ccMap d f (Exp e)           = gmapQ (ccQ e d f) e
+ccMap _ f (Dim _ _ e)       = [f e]
+ccMap _ f (Chc _ es)        = map f es
+ccMap d f (Let _ (Bnd b) u) = ccMap d f b ++ [f u]
+ccMap d _ (Ref _)           = [d]
 
 -- A list-specific version of ccMap.
 ccConcatMap :: ExpT e => (forall f. ExpT f => CC f -> [r]) -> CC e -> [r]
