@@ -140,6 +140,11 @@ getTags :: CC e -> Maybe [Tag]
 getTags (Dim _ ts _) = Just ts
 getTags _            = Nothing
 
+-- get the number of alternatives at this node, if applicable
+getAlts :: CC e -> Maybe Int
+getAlts (Chc _ es) = Just (length es)
+getAlts _          = Nothing
+
 -- get the variable name at this node, if applicable
 getVar :: CC e -> Maybe Var
 getVar (Let v _ _) = Just v
