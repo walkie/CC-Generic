@@ -47,24 +47,31 @@ data l :> t deriving Typeable
 
 -- build queries and ccTformations based on type-level lists of subexpression types
 class Typeable t => TypeList t where
-  ccQ' :: t -> r -> (forall u. ExpT u => CC u -> r)    -> (forall d. Data d => d -> r)
-  ccT' :: t ->      (forall u. ExpT u => CC u -> CC u) -> (forall d. Data d => d -> d)
+  ccQ' :: t -> r -> (forall u. ExpT u => CC u -> r)        -> GenericQ r
+  ccT' :: t ->      (forall u. ExpT u => CC u -> CC u)     -> GenericT
+  ccM' :: Monad m =>
+          t ->      (forall u. ExpT u => CC u -> m (CC u)) -> GenericM m
 
 instance ExpT t => TypeList (List t) where
-  ccQ' _ d f = mkQ d (asTypeOf f (undefined :: CC t -> r   ))
+  ccQ' _ d f = mkQ d (asTypeOf f (undefined :: CC t -> r))
   ccT' _   f = mkT   (asTypeOf f (undefined :: CC t -> CC t))
+  ccM' _   f = mkM   (asTypeOf f (undefined :: CC t -> m (CC t)))
 
 instance (ExpT t, TypeList l) => TypeList (l :> t) where
-  ccQ' _ d f = ccQ' (undefined :: l) d f `extQ` asTypeOf f (undefined :: CC t -> r   )
+  ccQ' _ d f = ccQ' (undefined :: l) d f `extQ` asTypeOf f (undefined :: CC t -> r)
   ccT' _   f = ccT' (undefined :: l)   f `extT` asTypeOf f (undefined :: CC t -> CC t)
+  ccM' _   f = ccM' (undefined :: l)   f `extM` asTypeOf f (undefined :: CC t -> m (CC t))
 
 -- Subexpression type class, should only need to instantiate the SubExps type.
 class (Data e, TypeList (SubExps e)) => ExpT e where
   type SubExps e
-  ccQ :: e -> r -> (forall f. ExpT f => CC f -> r)    -> (forall d. Data d => d -> r)
-  ccT :: e ->      (forall f. ExpT f => CC f -> CC f) -> (forall d. Data d => d -> d)
+  ccQ :: e -> r -> (forall f. ExpT f => CC f -> r)        -> GenericQ r
+  ccT :: e ->      (forall f. ExpT f => CC f -> CC f)     -> GenericT
+  ccM :: Monad m =>
+         e ->      (forall f. ExpT f => CC f -> m (CC f)) -> GenericM m
   ccQ _ r f = ccQ' (undefined :: SubExps e) r f
   ccT _   f = ccT' (undefined :: SubExps e)   f
+  ccM _   f = ccM' (undefined :: SubExps e)   f
 
 
 -----------------------
