@@ -10,6 +10,9 @@ import qualified Data.Set as S
 
 import CC.Syntax
 
+-- mappings from names to a
+type Map a = [(Name,a)]
+
 --------------------------
 -- Free and Bound Names --
 --------------------------
@@ -95,13 +98,25 @@ plain e = variationFree e && shareFree e
 -- is the expression well dimensioned?
 wellDim :: ExpT e => CC e -> Bool
 wellDim = well []
-  where well :: ExpT e => [(Dim,Int)] -> CC e -> Bool
+  where well :: ExpT e => Map Int -> CC e -> Bool
         well m (Dim d ts e) = well ((d,length ts):m) e
         well m (Chc d es)   = case lookup d m of
-                                 Just n    -> length es == n && all (ccAll (well m)) es
-                                 otherwise -> False
+                                 Just n  -> length es == n && all (ccAll (well m)) es
+                                 Nothing -> False
+        well m e = ccAll (well m) e
+
+-- are all references defined and well-typed?
+wellRef :: ExpT e => CC e -> Bool
+wellRef = well []
+  where check :: ExpT e => CC e -> Bound -> Maybe (CC e)
+        check _ (Bnd b) = cast b
+        well :: ExpT e => Map Bound -> CC e -> Bool
+        well m (Let v b u) = well ((v,b):m) u
+        well m e@(Ref v)   = case lookup v m >>= check e of
+                               Just _  -> True
+                               Nothing -> False
         well m e = ccAll (well m) e
 
 -- is the expression well formed?
 wellFormed :: ExpT e => CC e -> Bool
-wellFormed e = S.null (freeVars e) && wellDim e
+wellFormed e = wellRef e && wellDim e
