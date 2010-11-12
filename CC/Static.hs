@@ -4,11 +4,12 @@ module CC.Static where
 import Data.Generics
 
 import Data.List  (find)
-import Data.Maybe (fromJust)
+import Data.Maybe
 import Data.Set   (Set)
 import qualified Data.Set as S
 
 import CC.Syntax
+import CC.Error
 
 
 --------------------------
@@ -94,27 +95,30 @@ plain e = variationFree e && shareFree e
 ---------------------
 
 -- is the expression well dimensioned?
-wellDim :: ExpT e => CC e -> Bool
+wellDim :: ExpT e => CC e -> WellDim
 wellDim = well []
-  where well :: ExpT e => Map Dim Int -> CC e -> Bool
+  where well :: ExpT e => Map Dim Int -> CC e -> WellDim
         well m (Dim d ts e) = well ((d,length ts):m) e
         well m (Chc d es)   = case lookup d m of
-                                 Just n  -> length es == n && all (ccAll (well m)) es
-                                 Nothing -> False
-        well m e = ccAll (well m) e
+          Nothing -> err (UndefinedDim d)
+          Just n  -> let i = length es in
+                     if i /= n
+                       then err (ChcArityError d i)
+                       else checkAll $ map (well m) es
+        well m e = checkAll $ ccMap ok (well m) e
 
 -- are all references defined and well-typed?
-wellRef :: ExpT e => CC e -> Bool
+wellRef :: ExpT e => CC e -> WellRef
 wellRef = well []
-  where check :: ExpT e => CC e -> Bound -> Maybe (CC e)
-        check _ (Bnd b) = cast b
-        well :: ExpT e => Map Var Bound -> CC e -> Bool
-        well m (Let v b u) = onBnd (well m) b && well ((v,b):m) u
-        well m e@(Ref v)   = case lookup v m >>= check e of
-                               Just _  -> True
-                               Nothing -> False
-        well m e = ccAll (well m) e
+  where tryCast :: ExpT e => CC e -> Bound -> Maybe (CC e)
+        tryCast _ (Bnd b) = cast b 
+        well :: ExpT e => Map Var Bound -> CC e -> WellRef
+        well m (Let v b u) = checkAll [onBnd (well m) b, well ((v,b):m) u]
+        well m e@(Ref v)   = case lookup v m of
+          Nothing -> err (UndefinedVar v)
+          Just b  -> maybe (err (RefTypeError v)) (const ok) (tryCast e b)
+        well m e = checkAll $ ccMap ok (well m) e
 
 -- is the expression well formed?
-wellFormed :: ExpT e => CC e -> Bool
-wellFormed e = wellRef e && wellDim e
+wellFormed :: ExpT e => CC e -> WellFormed
+wellFormed e = checkAll [fmap NotWellRef (wellRef e), fmap NotWellDim (wellDim e)]
