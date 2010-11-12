@@ -1,9 +1,13 @@
+{-# LANGUAGE TupleSections #-}
+
 module CC.Semantics where
 
-import Control.Monad (guard)
+import Control.Monad
+import Control.Monad.Error
 import Data.List (elemIndex)
-import Data.Maybe (fromMaybe,fromJust)
+import Data.Typeable (cast)
 
+import CC.Error
 import CC.Syntax
 import CC.Zipper
 
@@ -17,56 +21,71 @@ type Decision = [QTag]
 
 -- Tag selection. Given qualified tag d.t, select tag t in the first
 -- dimension d encountered in an inorder traversal of the choice expression.
-selectTag :: QTag -> CC a -> Maybe (CC a)
-selectTag (d,t) e = do 
-    (c, Dim _ ts e') <- goto (match dim) e
-    i                <- elemIndex t ts
-    e''              <- choiceElim (d,i) e'
-    return (exit (c,e''))
-  where dim (Dim d' _ _) = d == d'
-        dim _            = False
+selectTag :: ExpT e => CC e -> QTag -> ErrM (CC e)
+selectTag e (d,t) = do
+    z <- maybeErr (NoMatchingDim d) $ match dimMatch (enter e)
+    i <- maybeErr (NoMatchingTag t) $ ccQuery Nothing getTags z >>= elemIndex t
+    liftM exit $ ccTransM (choiceElim (d,i) . dimElim) z
+  where dimElim  (Dim _ _ e) = e
+        dimMatch (Dim x _ _) = d == x
+        dimMatch _           = False
 
 -- Choice elimination Given selector d.i, replace all choices in dimension d
 -- with their ith alternative. Used in tag selection and the choice semantics.
-choiceElim :: Selector -> CC a -> Maybe (CC a)
+choiceElim :: ExpT e => Selector -> CC e -> ErrM (CC e)
 choiceElim (d,_) e@(Dim d' _ _) | d == d' = return e
-choiceElim (d,i) (Chc d' :< es) | d == d' = do guard (i < length es)
-                                               choiceElim (d,i) (es !! i)
+choiceElim (d,i)   (Chc d' es)  | d == d' = if i < length es
+                                            then throwError (NoAlternative i)
+                                            else choiceElim (d,i) (es !! i)
 choiceElim s e = transformSubsM (choiceElim s) e
 
 -- Make a decision by applying each selection in order.
-decide :: Decision -> CC a -> Maybe (CC a)
-decide d e = foldl (\m q -> m >>= selectTag q) (Just e) d
+decide :: ExpT e => CC e -> Decision -> ErrM (CC e)
+decide = foldM selectTag
 
 
 ------------------------
 -- Decision Semantics --
 ------------------------
 
-type Map k v = [(k,v)]
-type Semantics a = Map Decision a
+-- A wildly inefficient implementation of the decision semantics.  A more
+-- straightforward (and efficient) implementation is extremely difficult...
+-- However, some gains could be easily made by simply threading the zipper
+-- through each function, rather than starting back at the top each time.
 
--- Let expansion.  This transformation should only be applied to dimension-free
--- expressions, otherwise the semantics will be changed.
-letExp :: Map Var (CC a) -> CC a -> CC a
-letExp m (Let v b u) = letExp ((v, letExp m b):m) u
-letExp m e@(Ref v)   = fromMaybe e (lookup v m)
-letExp m e           = transformSubs (letExp m) e
+type Semantics e = Map Decision (CC e)
+
+-- Get the next dimension declaration, in a pre-order traversal.
+nextDecl :: ExpT e => CC e -> Maybe Decl
+nextDecl e = match isDim (enter e) >>= ccQuery Nothing getDecl
+
+-- Select each tag in a dimension declaration.
+selectAll :: ExpT e => CC e -> Decl -> ErrM (Map QTag (CC e))
+selectAll e (d,ts) = do
+    let qs = map (d,) ts
+    es <- mapM (selectTag e) qs
+    return (zip qs es)
 
 -- The variants of a choice calculus expression.  Removes all dimensions.
 -- Removes all choices if well-dimensioned.
-variants :: CC a -> Semantics (CC a)
-variants (Dim d ts e) = do
-    (t,i)   <- zip ts [0..]
-    (qs,e') <- variants (fromJust (choiceElim (d,i) e))
-    return ((d,t):qs, e')
-variants e | null (subs e) = [([],e)]
-           | otherwise     = [(qs, replaceSubs e es) | (qs,es) <- product e]
-  where product = cross . mapSubs variants
-        cross []     = []
-        cross [v]    = [(qs    , [e])  | (qs,e) <- v]
-        cross (v:vs) = [(qs++rs, e:es) | (qs,e) <- v, (rs,es) <- cross vs]
+variants :: ExpT e => CC e -> ErrM (Semantics e)
+variants e = do
+    qv <- maybe (return []) (selectAll e) (nextDecl e)
+    vs <- mapM (variants . snd) qv
+    return [(q:qs,e') | (q,v) <- zip (map fst qv) vs, (qs,e') <- v]
+
+-- Let expansion.  This transformation should only be applied to dimension-free
+-- expressions, otherwise the semantics will be changed.
+letExp :: ExpT e => Map Var Bound -> CC e -> ErrM (CC e)
+letExp m (Let v b u) = do b' <- inBndM (letExp m) b
+                          letExp ((v,b'):m) u
+letExp m (Ref v) = do Bnd b <- maybeErr (RefUndefined v) (lookup v m)
+                      maybeErr (RefTypeError v) (cast b)
+letExp m e = transformSubsM (letExp m) e
 
 -- If well-formed, provides a mapping from decisions to plain expressions.
-semantics :: CC a -> Semantics (CC a)
-semantics e = [(qs, letExp [] e') | (qs,e') <- variants e]
+semantics :: ExpT e => CC e -> ErrM (Semantics e)
+semantics e = do
+    vs <- variants e
+    es <- mapM (letExp []) (map snd vs)
+    return $ zip (map fst vs) es
