@@ -29,10 +29,35 @@ data CC e =
   | Chc Dim [CC e]        -- choice branching
   | Let Var Bound (CC e)  -- variable binding
   | Ref Var               -- variable reference
-  deriving Typeable
+  deriving (Eq,Show,Data,Typeable)
+
+
+-----------------------
+-- Bound Expressions --
+-----------------------
 
 data Bound = forall e. ExpT e => Bnd (CC e)
   deriving Typeable
+
+onBnd :: (forall e. ExpT e => CC e -> r) -> Bound -> r
+onBnd f (Bnd b) = f b
+
+inBnd :: (forall e. ExpT e => CC e -> CC e) -> Bound -> Bound
+inBnd f (Bnd b) = Bnd (f b)
+
+inBndM :: Monad m => (forall e. ExpT e => CC e -> m (CC e)) -> Bound -> m Bound
+inBndM f (Bnd b) = f b >>= return . Bnd
+
+instance Eq Bound where
+  _ == _ = False
+instance Show Bound where
+  show (Bnd e) = "Bnd " ++ show e
+instance Data Bound where
+  gfoldl k z (Bnd e) = z Bnd `k` e
+  gunfold = error "gunfold on Bound"
+  --gunfold k z _ = k (z Bnd)
+  toConstr b = mkConstr (dataTypeOf b) "Bnd" [] Prefix
+  dataTypeOf b = mkDataType "CC.Syntax.Bound" [toConstr b]
 
 
 -----------------------------
@@ -63,7 +88,7 @@ instance (ExpT t, TypeList l) => TypeList (l :> t) where
   ccM' _   f = ccM' (undefined :: l)   f `extM` asTypeOf f (undefined :: CC t -> m (CC t))
 
 -- Subexpression type class, should only need to instantiate the SubExps type.
-class (Data e, TypeList (SubExps e)) => ExpT e where
+class (Data e, TypeList (SubExps e), Eq e, Show e) => ExpT e where
   type SubExps e
   ccQ :: e -> r -> (forall f. ExpT f => CC f -> r)        -> GenericQ r
   ccT :: e ->      (forall f. ExpT f => CC f -> CC f)     -> GenericT
@@ -104,9 +129,15 @@ ccAny :: ExpT e => (forall f. ExpT f => CC f -> Bool) -> CC e -> Bool
 ccAny f = or . ccMap False f
 
 
-----------------------------
--- Other Useful Functions --
-----------------------------
+------------------------
+-- Other Useful Stuff --
+------------------------
+
+-- mappings from k to v
+type Map k v = [(k,v)]
+
+-- dimension declaration
+type Decl = (Dim,[Tag])
 
 -- for manipulating types only
 unCC :: CC e -> e
@@ -139,6 +170,11 @@ getDim _           = Nothing
 getTags :: CC e -> Maybe [Tag]
 getTags (Dim _ ts _) = Just ts
 getTags _            = Nothing
+
+-- get the dimension declaration at this node, if applicable
+getDecl :: CC e -> Maybe Decl
+getDecl (Dim d ts _) = Just (d,ts)
+getDecl _            = Nothing
 
 -- get the number of alternatives at this node, if applicable
 getAlts :: CC e -> Maybe Int
