@@ -6,9 +6,9 @@ import Control.Monad.Error
 import CC.Syntax
 
 -- choice calculus error monad
-type CCM = Either CCError
+type ErrM = Either Err
 
-data CCError =
+data Err =
   -- tag selection
     NoMatchingDim Dim
   | NoMatchingTag Tag
@@ -25,5 +25,8 @@ data CCError =
   | OtherError    String
   deriving (Eq,Show)
 
-instance Error CCError where
+instance Error Err where
   strMsg = OtherError
+
+maybeErr :: Err -> Maybe a -> ErrM a
+maybeErr e = maybe (throwError e) return
