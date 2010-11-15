@@ -113,11 +113,11 @@ ccM e f = ccM' (getSubExps e) f
 -- Apply a function to every immediate choice calculus subexpression of an
 -- expression and collect the results.
 ccMap :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CC e -> [r]
-ccMap d f (Exp e)           = gmapQ (ccQ e d f) e
-ccMap _ f (Dim _ _ e)       = [f e]
-ccMap _ f (Chc _ es)        = map f es
-ccMap d f (Let _ (Bnd b) u) = ccMap d f b ++ [f u]
-ccMap d _ (Ref _)           = [d]
+ccMap d f (Exp e)     = everything (++) (gmapQ (ccQ e d f)) e
+ccMap _ f (Dim _ _ e) = [f e]
+ccMap _ f (Chc _ es)  = map f es
+ccMap d f (Let _ b u) = onBnd (ccMap d f) b ++ [f u]
+ccMap d _ (Ref _)     = [d]
 
 -- A list-specific version of ccMap.
 ccConcatMap :: ExpT e => (forall f. ExpT f => CC f -> [r]) -> CC e -> [r]
