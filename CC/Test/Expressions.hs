@@ -4,14 +4,14 @@ import CC
 import CC.Tree
 
 exprs :: [TreeCC Int]
-exprs = [b1,b2,b3,
-         s1,s2,s3,
-         s1',s2',s3',
-         v1,v2,v3,v4,v5,v6,v7]
+exprs = bs ++ ss ++ vs
 
 -- 
 -- basic expressions
 --
+
+bs :: [TreeCC Int]
+bs = [b1,b2,b3,s1',s2',s3']
 
 b1 = leaf 1
 b2 = node 1 [leaf 2, leaf 3]
@@ -20,6 +20,9 @@ b3 = node 4 [b2, leaf 5]
 -- 
 -- expressions with sharing
 --
+
+ss :: [TreeCC Int]
+ss = [s1,s2,s3]
 
 s1 :: TreeCC Int
 s1 = Let "v" (Bnd b1) (Ref "v")
@@ -34,6 +37,9 @@ s3' = node 3 [b3, s2']
 --
 -- expressions with variation
 --
+
+vs :: [TreeCC Int]
+vs = [v1,v2,v3,v4,v5,v6,v7]
 
 dimA = Dim "A" ["a","b"]
 dimB = Dim "B" ["c","d","e"]
