@@ -31,8 +31,8 @@ s1' = b1
 s2 = Let "u" (Bnd s1) $ node 2 [b2, Ref "u"]
 s2' = node 2 [b2, s1']
 
-s3 = Let "v" (Bnd s2) $ node 3 [b3, Ref "v"]
-s3' = node 3 [b3, s2']
+s3 = Let "v" (Bnd s2) $ node 3 [s1, Ref "v"]
+s3' = node 3 [s1', s2']
 
 --
 -- expressions with variation
