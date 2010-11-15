@@ -8,6 +8,7 @@ import Control.Monad (liftM)
 import Test.QuickCheck.Gen
 
 import CC.Syntax
+import CC.Tree
 
 
 -----------------------
@@ -60,9 +61,9 @@ addVar v s = s { varEnv = v : varEnv s }
 -- Choice Calculus Generators --
 --------------------------------
 
-type GenCC a = GenState a -> Gen (CC a)
+type GenCC a = GenState a -> Gen (TreeCC a)
 
-genCC :: GenCC a
+genCC :: TreeVal a => GenCC a
 genCC s | maxDepth s < 2 = genLeaf (inc s)
         | otherwise      = oneof (map ($ inc s) gens)
   where gens = [genLeaf, genStr, genLet, genDim] 
@@ -72,27 +73,27 @@ genCC s | maxDepth s < 2 = genLeaf (inc s)
 genLeaf :: GenCC a
 genLeaf s = liftM leaf (genVal s)
 
-genStr :: GenCC a
+genStr :: TreeVal a => GenCC a
 genStr s = do a  <- genVal s
               es <- resize (maxBranch s) (listOf (genCC s))
-              return (str a es)
+              return (node a es)
 
-genLet :: GenCC a
+genLet :: TreeVal a => GenCC a
 genLet s = do v <- genVarName
               b <- genCC s
               u <- genCC (addVar v s)
-              return (Let v b u)
+              return (Let v (Bnd b) u)
 
 genRef :: GenCC a
 genRef s = liftM Ref (elements (varEnv s))
 
-genDim :: GenCC a
+genDim :: TreeVal a => GenCC a
 genDim s = do d  <- genDimName
               ts <- resize (maxBranch s) genTagNames
               e  <- genCC (addDim d ts s)
               return (Dim d ts e)
 
-genChc :: GenCC a
+genChc :: TreeVal a => GenCC a
 genChc s = do (d,i) <- elements (dimEnv s)
               as    <- vectorOf i (genCC s)
-              return (chc d as)
+              return (Chc d as)
