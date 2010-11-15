@@ -1,18 +1,17 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
-module CC.Pretty (pretty,bw,color,ShowCC(..)) where
+module CC.Pretty where
 
 import Control.Monad.State
 import Data.List (intersperse)
 
 import CC.Syntax
 
-
 ----------------------
 -- Public Interface --
 ----------------------
 
-pretty :: ShowCC a => Colors -> CC a -> String
+pretty :: ExpT e => Colors -> CC e -> String
 pretty c e = evalState (cc e) c
 
 bw,color :: Colors
@@ -22,16 +21,6 @@ color = Colors { _op  = style blue,
                  _var = style red,
                  _dim = style green,
                  _tag = style green }
-
-class ShowCC a where
-  showCC :: a -> String
-instance ShowCC Int where
-  showCC = show
-instance ShowCC String where
-  showCC = id
-
-instance ShowCC a => Show (CC a) where
-  show = pretty color -- Windows users: change to "pretty bw"
 
 
 -------------
@@ -54,9 +43,6 @@ cat = liftM concat . sequence
 adorn :: (Colors -> String -> String) -> String -> Pretty String
 adorn f s = get >>= return . flip f s
 
-val :: ShowCC a => a -> Pretty String
-val = return . showCC
-
 op,key,var,dim,tag :: String -> Pretty String
 op  = adorn _op
 key = adorn _key
@@ -75,13 +61,12 @@ braces = surround return "{" "}"
 bracks = surround op     "<" ">"
 parens = surround op     "(" ")"
 
-cc :: ShowCC a => CC a -> Pretty String
-cc (Str a :< []) = val a
-cc (Str a :< es) = cat [val a, (braces . commas return) (map cc es)]
-cc (Chc d :< es) = cat [dim d, (bracks . commas op) (map cc es)]
-cc (Dim d t e)   = cat [key "dim ", dim d, (bracks . commas op) (map tag t), key " in ", parens (cc e)]
-cc (Let v b u)   = cat [key "let ", var v, op " = ", parens (cc b), key " in ", parens (cc u)]
-cc (Ref v)       = var v
+cc :: ExpT e => CC e -> Pretty String
+cc (Exp e)           = return (show e)
+cc (Chc d es)        = cat [dim d, (bracks . commas op) (map cc es)]
+cc (Dim d t e)       = cat [key "dim ", dim d, (bracks . commas op) (map tag t), key " in ", parens (cc e)]
+cc (Let v (Bnd b) u) = cat [key "let ", var v, op " = ", parens (cc b), key " in ", parens (cc u)]
+cc (Ref v)           = var v
 
 
 --------------------------------------

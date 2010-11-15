@@ -29,7 +29,7 @@ data CC e =
   | Chc Dim [CC e]        -- choice branching
   | Let Var Bound (CC e)  -- variable binding
   | Ref Var               -- variable reference
-  deriving (Eq,Show,Data,Typeable)
+  deriving (Eq,Data,Typeable)
 
 
 -----------------------
@@ -50,8 +50,6 @@ inBndM f (Bnd b) = f b >>= return . Bnd
 
 instance Eq Bound where
   _ == _ = False
-instance Show Bound where
-  show (Bnd e) = "Bnd " ++ show e
 instance Data Bound where
   gfoldl k z (Bnd e) = z Bnd `k` e
   gunfold = error "gunfold on Bound"

@@ -1,22 +1,35 @@
-{-# LANGUAGE DeriveDataTypeable, TypeFamilies #-}
+{-# LANGUAGE DeriveDataTypeable, TypeFamilies, TypeSynonymInstances #-}
 module CC.Tree where
 
 import Control.Monad (guard)
+import Control.Monad.State (evalState)
 import Data.Generics
 
 import CC.Syntax
+import CC.Pretty
+
 
 -------------------
 -- Vanilla Trees --
 -------------------
 
+-- Choice calculus expressions with basic generic structural branching.
 type TreeCC a = CC (Tree a)
 
--- Structural branching
+-- Structural branching.
 data Tree a = Tree a [CC (Tree a)]
-  deriving (Eq,Show,Data,Typeable)
+  deriving (Eq,Data,Typeable)
 
-instance (Eq a, Show a, Data a) => ExpT (Tree a) where
+-- Tree value type class and some basic instances.
+class (Eq a, Data a) => TreeVal a where
+  showVal :: a -> String
+instance TreeVal Int where
+  showVal = show
+instance TreeVal String where
+  showVal = id
+
+-- ExpT instance.
+instance TreeVal a => ExpT (Tree a) where
   type SubExps (Tree a) = List (Tree a)
 
 
@@ -60,3 +73,13 @@ fromTreeCC = other `extR` string
                             guard (glength a == length es)
                             snd (gmapAccumM (\(x:xs) _ -> (xs,fromTreeCC x)) es a)
         other _ = Nothing -- CC expression is not plain
+
+
+---------------------
+-- Pretty Printing --
+---------------------
+
+instance TreeVal a => Show (Tree a) where
+  show (Tree a []) = showVal a
+  show (Tree a es) = showVal a ++ evalState subs bw
+    where subs = (braces . commas return) (map cc es)
