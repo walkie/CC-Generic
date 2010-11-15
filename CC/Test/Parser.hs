@@ -8,7 +8,7 @@ import Test.Framework.Providers.QuickCheck2 -- requires QuickCheck-2.1.1.1
 import Test.HUnit
 import Test.QuickCheck
 
-import CC.Syntax
+import CC
 import CC.Parser
 import CC.Pretty
 import CC.Test.Expressions
