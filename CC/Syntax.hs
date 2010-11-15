@@ -90,13 +90,19 @@ instance (ExpT t, TypeList l) => TypeList (l :> t) where
 -- Subexpression type class, should only need to instantiate the SubExps type.
 class (Data e, TypeList (SubExps e), Eq e, Show e) => ExpT e where
   type SubExps e
-  ccQ :: e -> r -> (forall f. ExpT f => CC f -> r)        -> GenericQ r
-  ccT :: e ->      (forall f. ExpT f => CC f -> CC f)     -> GenericT
-  ccM :: Monad m =>
-         e ->      (forall f. ExpT f => CC f -> m (CC f)) -> GenericM m
-  ccQ _ r f = ccQ' (undefined :: SubExps e) r f
-  ccT _   f = ccT' (undefined :: SubExps e)   f
-  ccM _   f = ccM' (undefined :: SubExps e)   f
+
+-- Just used for its type
+getSubExps :: ExpT e => e -> SubExps e
+getSubExps = undefined
+
+ccQ :: ExpT e => e -> r -> (forall f. ExpT f => CC f -> r) -> GenericQ r
+ccQ e r f = ccQ' (getSubExps e) r f
+
+ccT :: ExpT e => e -> (forall f. ExpT f => CC f -> CC f) -> GenericT
+ccT e f = ccT' (getSubExps e) f
+
+ccM :: (ExpT e, Monad m) => e -> (forall f. ExpT f => CC f -> m (CC f)) -> GenericM m
+ccM e f = ccM' (getSubExps e) f
 
 
 -----------------------
