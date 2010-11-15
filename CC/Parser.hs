@@ -2,22 +2,21 @@
 
 module CC.Parser (parse,makeBW,ReadCC(..)) where
 
-import CC.Syntax
-
 import Text.Parsec hiding (choice,parse)
 import Text.Parsec.String (Parser)
 import qualified Text.Parsec.Token as Lex
 import Text.Parsec.Language (emptyDef)
 
-import CC.Pretty
+import CC.Syntax
+import CC.Tree
+import CC.Show
+
 
 ----------------------
 -- Public Interface --
 ----------------------
 
---type Parser = Parsec String (String -> Maybe a)
-
-parse :: ReadCC a => String -> CC a
+parse :: ReadCC a => String -> TreeCC a
 parse = either (error . show) id . runParser justExpr () "" . makeBW
   where justExpr = expr >>= \e -> eof >> return e
 
@@ -27,7 +26,7 @@ makeBW ('\27':s) = (makeBW . tail . dropWhile (/= 'm')) s
 makeBW (c:s)     = c : makeBW s
 makeBW []        = []
 
-class ReadCC a where
+class TreeVal a => ReadCC a where
   readCC :: Parser a
 
 instance ReadCC Int where
@@ -70,7 +69,7 @@ reservedOp = Lex.reservedOp lexer
 -- Parsers --
 -------------
 
-expr :: ReadCC a => Parser (CC a)
+expr :: ReadCC a => Parser (TreeCC a)
 expr = parens expr <|> bind <|> ref <|> dim <|> try choice <|> struct
 
 ignore :: Parser a -> Parser ()
@@ -82,19 +81,19 @@ list = flip sepBy comma
 var :: Parser String
 var = reservedOp "$" >> identifier
 
-struct :: ReadCC a => Parser (CC a)
+struct :: ReadCC a => Parser (TreeCC a)
 struct = do
     a  <- readCC
     es <- option [] (braces (list expr))
-    return (Str a :< es)
+    return (node a es)
 
-choice :: ReadCC a => Parser (CC a)
+choice :: ReadCC a => Parser (TreeCC a)
 choice = do
     d  <- identifier
     as <- angles (list expr)
-    return (Chc d :< as)
+    return (Chc d as)
 
-dim :: ReadCC a => Parser (CC a)
+dim :: ReadCC a => Parser (TreeCC a)
 dim = do 
     reserved "dim"
     d  <- identifier
@@ -103,7 +102,7 @@ dim = do
     e  <- expr
     return (Dim d ts e)
 
-bind :: ReadCC a => Parser (CC a)
+bind :: ReadCC a => Parser (TreeCC a)
 bind = do
     reserved "let"
     v <- var
@@ -111,7 +110,8 @@ bind = do
     b <- expr
     reserved "in"
     u <- expr
-    return (Let v b u)
+    let b' = b `asTypeOf` u -- hack
+    return (Let v (Bnd b') u)
 
-ref :: Parser (CC a)
+ref :: Parser (TreeCC a)
 ref = var >>= return . Ref
