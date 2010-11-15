@@ -70,7 +70,7 @@ data List t deriving Typeable
 -- type-level left-associative cons
 data l :> t deriving Typeable
 
--- build queries and ccTformations based on type-level lists of subexpression types
+-- build queries and transformations based on type-level lists of subexpression types
 class Typeable t => TypeList t where
   ccQ' :: t -> r -> (forall u. ExpT u => CC u -> r)        -> GenericQ r
   ccT' :: t ->      (forall u. ExpT u => CC u -> CC u)     -> GenericT
@@ -91,16 +91,19 @@ instance (ExpT t, TypeList l) => TypeList (l :> t) where
 class (Data e, TypeList (SubExps e), Eq e, Show e) => ExpT e where
   type SubExps e
 
--- Just used for its type
+-- Just used for its type.
 getSubExps :: ExpT e => e -> SubExps e
 getSubExps = undefined
 
+-- Construct a generic query over choice calculus expressions.
 ccQ :: ExpT e => e -> r -> (forall f. ExpT f => CC f -> r) -> GenericQ r
 ccQ e r f = ccQ' (getSubExps e) r f
 
+-- Construct a generic transformation over choice calculus expressions.
 ccT :: ExpT e => e -> (forall f. ExpT f => CC f -> CC f) -> GenericT
 ccT e f = ccT' (getSubExps e) f
 
+-- Construct a generic monadic transformation over choice calculus expressions.
 ccM :: (ExpT e, Monad m) => e -> (forall f. ExpT f => CC f -> m (CC f)) -> GenericM m
 ccM e f = ccM' (getSubExps e) f
 
