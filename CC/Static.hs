@@ -11,6 +11,9 @@ import qualified Data.Set as S
 import CC.Syntax
 import CC.Error
 
+import CC.Show
+import CC.Tree
+import Debug.Trace
 
 --------------------------
 -- Free and Bound Names --
@@ -23,8 +26,8 @@ boundDims e           = ccUnionsMap boundDims e
 
 -- set of bound variables
 boundVars :: ExpT e => CC e -> Set Var
-boundVars (Let v (Bnd b) e) = S.insert v (ccUnionsMap boundVars b `S.union` boundVars e)
-boundVars e                 = ccUnionsMap boundVars e
+boundVars (Let v b e) = S.insert v (onBnd boundVars b `S.union` boundVars e)
+boundVars e           = ccUnionsMap boundVars e
 
 -- set of free dimensions
 freeDims :: ExpT e => CC e -> Set Dim
@@ -34,9 +37,9 @@ freeDims e           = ccUnionsMap freeDims e
 
 -- set of free variables
 freeVars :: ExpT e => CC e -> Set Var
-freeVars (Let v (Bnd b) e) = S.delete v (freeVars e) `S.union` ccUnionsMap freeVars b
-freeVars (Ref v)           = S.singleton v
-freeVars e                 = ccUnionsMap freeVars e
+freeVars (Let v b e) = S.delete v (freeVars e) `S.union` onBnd (ccUnionsMap freeVars) b
+freeVars (Ref v)     = S.singleton v
+freeVars e           = ccUnionsMap freeVars e
 
 -- generate an unused name given a seed name, used names are given in a set
 safeName :: Name -> Set Name -> Name
