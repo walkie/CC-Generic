@@ -49,7 +49,7 @@ inBndM :: Monad m => (forall e. ExpT e => CC e -> m (CC e)) -> Bound -> m Bound
 inBndM f (Bnd b) = f b >>= return . Bnd
 
 instance Eq Bound where
-  _ == _ = False
+  (Bnd a) == (Bnd b) = maybe False (a==) (asTypeOf (cast b) (Just a))
 instance Data Bound where
   gfoldl k z (Bnd e) = z Bnd `k` e
   gunfold = error "gunfold on Bound"
