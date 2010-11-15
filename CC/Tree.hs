@@ -17,7 +17,7 @@ import CC.Pretty
 type TreeCC a = CC (Tree a)
 
 -- Structural branching.
-data Tree a = Tree a [CC (Tree a)]
+data Tree a = Tree a [TreeCC a]
   deriving (Eq,Data,Typeable)
 
 -- Tree value type class and some basic instances.
@@ -81,5 +81,5 @@ fromTreeCC = other `extR` string
 
 instance TreeVal a => Show (Tree a) where
   show (Tree a []) = showVal a
-  show (Tree a es) = showVal a ++ evalState subs bw
+  show (Tree a es) = showVal a ++ evalState subs color
     where subs = (braces . commas return) (map cc es)
