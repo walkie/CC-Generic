@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, OverlappingInstances, TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module CC.Test.Parser where
 
 import Test.Framework
