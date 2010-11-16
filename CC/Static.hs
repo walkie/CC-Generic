@@ -11,9 +11,6 @@ import qualified Data.Set as S
 import CC.Syntax
 import CC.Error
 
-import CC.Show
-import CC.Tree
-import Debug.Trace
 
 --------------------------
 -- Free and Bound Names --
