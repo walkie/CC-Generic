@@ -110,14 +110,21 @@ ccM e f = ccM' (getSubExps e) f
 -- Generic Functions --
 -----------------------
 
+-- Execute a query everywhere, stopping recursion when the provided predicate
+-- is satisfied.
+everyUntil :: GenericQ Bool -> GenericQ r -> GenericQ [r]
+everyUntil q f x | q x       = [f x]
+                 | otherwise = f x : concat (gmapQ (everyUntil q f) x)
+
 -- Apply a function to every immediate choice calculus subexpression of an
 -- expression and collect the results.
 ccMap :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CC e -> [r]
-ccMap d f (Exp e)     = everything (++) (gmapQ (ccQ e d f)) e
+ccMap d f (Exp e)     = everyUntil (ccQ e False isCC) (ccQ e d f) e
 ccMap _ f (Dim _ _ e) = [f e]
 ccMap _ f (Chc _ es)  = map f es
-ccMap d f (Let _ b u) = onBnd (ccMap d f) b ++ [f u]
+ccMap d f (Let _ b u) = onBnd f b : [f u]
 ccMap d _ (Ref _)     = [d]
+        
 
 -- A list-specific version of ccMap.
 ccConcatMap :: ExpT e => (forall f. ExpT f => CC f -> [r]) -> CC e -> [r]
@@ -153,6 +160,10 @@ unCC = error "unCC was evaluated..."
 -- for manipulating types only
 unXCC :: x (CC e) -> e
 unXCC = error "unXCC was evaluated..."
+
+-- true if this is a choice calculus expression (useful in generic functions)
+isCC :: CC e -> Bool
+isCC _ = True
 
 -- true if the top node is of the corresponding syntactic category
 isExp, isDim, isChc, isLet, isRef :: CC e -> Bool
