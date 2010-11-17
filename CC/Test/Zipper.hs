@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell, TypeSynonymInstances, ScopedTypeVariables #-}
 module CC.Test.Zipper where
 
 import Debug.Trace
@@ -10,16 +10,18 @@ import Test.Framework.Providers.QuickCheck2 -- requires QuickCheck-2.1.1.1
 import Test.HUnit
 import Test.QuickCheck
 
+import CC.Arbitrary
+import CC.Show
 import CC.Syntax
+import CC.Tree
 import CC.Zipper
-import CC.Test.Gen
 
 ----------------
 -- Invariants --
 ----------------
 
 prop_enterExit e = e == (exit . enter) e
-  where types = e :: CC Int
+  where types = e :: TreeCC Int
 
 -----------------------
 -- "Automated" Tests --
@@ -27,6 +29,9 @@ prop_enterExit e = e == (exit . enter) e
 
 tests = [$(testGroupGenerator)]
 runTests = defaultMain tests
+
+instance (Arbitrary a, TreeVal a) => Arbitrary (TreeCC a) where
+  arbitrary = genCC (genState 20 3 arbitrary)
 
 --
 -- QuickCheck
