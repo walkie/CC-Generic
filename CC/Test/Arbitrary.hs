@@ -27,9 +27,9 @@ prop_wellFormed e = wellFormed e == ok
 -- "Automated" Tests --
 -----------------------
 
-tests = $(testGroupGenerator)
+tests = $(testGroupGenerator) : []
 
-runTests = defaultMain [tests]
+runTests = defaultMain tests
 
 instance (Arbitrary a, TreeVal a) => Arbitrary (TreeCC a) where
   arbitrary = genCC (genState 20 3 arbitrary)
