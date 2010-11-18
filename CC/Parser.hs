@@ -110,7 +110,7 @@ bind = do
     b <- expr
     reserved "in"
     u <- expr
-    let b' = b `asTypeOf` u -- hack
+    let b' = b `asTypeOf` u -- hack (and wrong)
     return (Let v (Bnd b') u)
 
 ref :: Parser (TreeCC a)
