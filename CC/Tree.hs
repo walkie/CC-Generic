@@ -25,6 +25,8 @@ class (Eq a, Data a) => TreeVal a where
   showVal :: a -> String
 instance TreeVal Int where
   showVal = show
+instance TreeVal Bool where
+  showVal = show
 instance TreeVal String where
   showVal = id
 
