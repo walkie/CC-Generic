@@ -25,10 +25,10 @@ exprs,wfs,nwfs,nwds,nwrs :: [TreeCC Int]
 exprs = wfs ++ nwfs
 
 -- all well formed expressions
-wfs = bs ++ ss ++ vs
+wfs = bs ++ ss ++ vs ++ svs
 
 -- all not well formed expressions
-nwfs = nwds ++ nwrs
+nwfs = nwds ++ nwrs ++ xsvs
 
 -- all not well-referenced expressions
 nwrs = xss
@@ -118,3 +118,10 @@ ce5 = dimA $ Chc "A" [Chc "A" [b1], leaf 2]
 -- Sharing + Variation --
 -------------------------
 
+svs = [sv1,sv2]
+sv1 = Let "v" (Bnd v1) $ node 0 [Ref "v", Ref "v"] :: TreeCC Int
+sv2 = dimA $ Let "v" (Bnd ca1) $ dimA $ Chc "A" [ca1, Ref "v"]
+
+-- not well-formed
+xsvs = [xsv1]
+xsv1 = Let "v" (Bnd ca1) $ dimA (Ref "v") :: TreeCC Int
