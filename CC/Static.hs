@@ -34,7 +34,7 @@ freeDims e           = ccUnionsMap freeDims e
 
 -- set of free variables
 freeVars :: ExpT e => CC e -> Set Var
-freeVars (Let v b e) = S.delete v (freeVars e) `S.union` onBnd (ccUnionsMap freeVars) b
+freeVars (Let v b e) = S.delete v (freeVars e) `S.union` onBnd freeVars b
 freeVars (Ref v)     = S.singleton v
 freeVars e           = ccUnionsMap freeVars e
 
