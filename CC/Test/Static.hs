@@ -23,42 +23,58 @@ tests = $(testGroupGenerator)
      ++ test_boundVars
      ++ test_freeDims
      ++ test_freeVars
+     ++ test_bindFree
+     ++ test_refFree
+     ++ test_dimFree
+     ++ test_choiceFree
+     ++ test_shareFree
+     ++ test_variationFree
+     ++ test_plain
      ++ []
 
 runTests = defaultMain tests
 
+-- There are two implementations of this function.  The first condenses all
+-- cases into a single test, which makes for nicer test output.  The second
+-- runs each case separately, which is useful for debugging a failed test
+testSame n as es = [testCase n $ as @?= take (length as) es]
+{-
 testSame n as es = zipWith testCase names (zipWith (@?=) as es)
   where names = [n ++ ' ' : show i | i <- [0..]]
-
-test_boundDims = testSame "boundDims none" (map boundDims (bs ++ ss)) (repeat empty)
-              ++ testSame "boundDims some" (map boundDims (vs ++ svs))
-                   (map fromList [["A"],["A"],["A","B"],["A","B"],["A","B"],["A","B"],["A"],["A"],["A"]])
-
-test_boundVars = testSame "boundVars none" (map boundVars (bs ++ vs)) (repeat empty)
-              ++ testSame "boundVars some" (map boundVars (ss ++ svs))
-                   (map fromList [["v"],["u","v"],["u","v"],["v"],["v"]])
-
-test_freeDims = testSame "freeDims none" (map freeDims (wfs ++ nwrs)) (repeat empty)
-             ++ testSame "freeDims some" (map freeDims (uds ++ xsvs))
-                   (map fromList [["A"],["A"],["A"],["A"]])
-
-test_freeVars = testSame "freeVars none" (map freeVars (wfs ++ nwds)) (repeat empty)
-             ++ testSame "freeVars some" (map freeVars uvs)
-                   (map fromList [["v"],["v"],["v"],["v"]])
-
-{-
-case_freeDims  = undefined
-case_freeVars  = undefined
-
-case_bindFree      = undefined
-case_refFree       = undefined
-case_dimFree       = undefined
-case_choiceFree    = undefined
-case_shareFree     = undefined
-case_variationFree = undefined
-case_plain         = undefined
-
-case_wellDim    = undefined
-case_wellRef    = undefined
-case_wellFormed = undefined
 -}
+
+testNoneSome n f nones somes rs =
+       testSame (n ++ " none") (map f nones) (repeat empty)
+    ++ testSame (n ++ " some") (map f somes) (map fromList rs)
+
+testAllNone n f alls nones =
+       testSame (n ++ " yes") (map f alls)  (repeat True)
+    ++ testSame (n ++ " no ") (map f nones) (repeat False)
+
+
+test_boundDims = testNoneSome "boundDims" boundDims dfs ndfs
+                 [a,ab,                -- ud2,ud3
+                  a,a,a,ab,ab,ab,ab,a, -- vs
+                  a,a,a,a,             -- svs ++ xsvs
+                  a,b,a,a,a]           -- ces
+  where { a = ["A"]; ab = ["A","B"]; b = ["B"] }
+
+test_boundVars = testNoneSome "boundVars" boundVars bfs nbfs
+                 [v,v,       -- tail uvs
+                  v,uv,uv,v, -- ss
+                  v,v,v,v]   -- svs ++ xsvs
+  where { v = ["v"]; uv = ["u","v"] }
+
+test_freeDims = testNoneSome "freeDims" freeDims (xsv2 : wfs ++ nwrs) (xsv1 : uds)
+                (replicate 4 ["A"])
+
+test_freeVars = testNoneSome "freeVars" freeVars (wfs ++ nwds) uvs
+                (replicate 4 ["v"])
+
+test_bindFree      = testAllNone "bindFree"      bindFree      bfs nbfs
+test_refFree       = testAllNone "refFree"       refFree       rfs nrfs
+test_dimFree       = testAllNone "dimFree"       dimFree       dfs ndfs
+test_choiceFree    = testAllNone "choiceFree"    choiceFree    cfs ncfs
+test_shareFree     = testAllNone "shareFree"     shareFree     sfs nsfs
+test_variationFree = testAllNone "variationFree" variationFree vfs nvfs
+test_plain         = testAllNone "plain"         plain         ps  nps
