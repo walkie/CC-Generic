@@ -82,7 +82,8 @@ b3 = node 4 [b2, leaf 5]     :: TreeCC Int
 -------------
 
 -- well-ref'ed
-ss = [s1,s2,s3,s4]
+ss  = [s1 ,s2 ,s3 ,s4 ]
+ss' = [s1',s2',s3',s4']
 
 s1 = Let "v" (Bnd b1) (Ref "v") :: TreeCC Int
 s1' = b1

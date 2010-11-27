@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module CC.Test.Static where
 
 import CC
@@ -10,8 +9,7 @@ import CC.Test.Expressions
 -- "Automated" Tests --
 -----------------------
 
-tests = $(testGroupGenerator)
-      : test_boundDims
+tests = test_boundDims
      ++ test_boundVars
      ++ test_freeDims
      ++ test_freeVars
@@ -28,6 +26,11 @@ tests = $(testGroupGenerator)
      ++ []
 
 runTests = defaultMain tests
+
+
+----------------
+-- Test Cases --
+----------------
 
 test_boundDims = testNoneSome "boundDims" boundDims dfs ndfs
                  [a,ab,                -- ud2,ud3
