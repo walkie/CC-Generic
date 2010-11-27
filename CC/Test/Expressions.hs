@@ -3,7 +3,7 @@ module CC.Test.Expressions where
 import CC
 import CC.Tree
 
-import Data.List (intersect,union)
+import Data.List ((\\),intersect,union)
 
 ------------------------
 -- Smart Constructors --
@@ -25,17 +25,17 @@ exprs,wfs,nwfs,nwds,nwrs :: [TreeCC Int]
 -- everything
 exprs = wfs ++ nwfs
 
--- all well formed expressions
+-- well formed expressions
 wfs = bs ++ ss ++ vs ++ svs
+nwfs = nwds ++ nwrs
 
--- all not well formed expressions
-nwfs = nwds ++ nwrs ++ xsvs
+-- well referenced expressions
+wrs = exprs \\ nwrs
+nwrs = xsv2 : xss
 
--- all not well-referenced expressions
-nwrs = xss
-
--- all not well-dimensioned expressions
-nwds = xvs
+-- well dimensioned expressions
+wds = exprs \\ nwds
+nwds = xsv1 : xvs
 
 -- binding free
 bfs = uv1 : bs ++ vs ++ xvs
@@ -64,6 +64,7 @@ nvfs = ndfs `intersect` ndfs
 -- plain
 ps = sfs `intersect` vfs
 nps = nsfs `intersect` nvfs
+
 
 -----------------------
 -- Basic Expressions --
