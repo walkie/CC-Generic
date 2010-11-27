@@ -122,3 +122,12 @@ wellRef = well []
 -- is the expression well formed?
 wellFormed :: ExpT e => CC e -> WellFormed
 wellFormed e = checkAll [fmap NotWellRef (wellRef e), fmap NotWellDim (wellDim e)]
+
+isWellDim :: ExpT e => CC e -> Bool
+isWellDim = (ok ==) . wellDim
+
+isWellRef :: ExpT e => CC e -> Bool
+isWellRef = (ok ==) . wellRef
+
+isWellFormed :: ExpT e => CC e -> Bool
+isWellFormed = (ok ==) . wellFormed
