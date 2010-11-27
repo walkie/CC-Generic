@@ -7,7 +7,7 @@ module CC.Test (
     module Test.Framework.Providers.QuickCheck2,
     module Test.HUnit,
     module Test.QuickCheck,
-    testSame,testAB,testAB',testABC,testABC',testNoneSome,testAllNone
+    testSame,testSames,testSames',testNoneSome,testAllNone
   ) where
 
 import Test.Framework
@@ -30,43 +30,17 @@ testSame n as es = zipWith testCase names (zipWith (@?=) as es)
   where names = [n ++ ' ' : show i | i <- [0..]]
 #endif
 
-testAB :: (Eq b, Show b) => String -> (a -> b)
-                         -> String -> String
-                         -> [a]    -> [a]
-                         -> [b]    -> [b]
-                         -> [Test]
-testAB n f na nb as bs as' bs' =
-       testSame (n ++ " " ++ na) (map f as) as'
-    ++ testSame (n ++ " " ++ nb) (map f bs) bs'
+testSames :: (Eq b, Show b) => String -> (a -> b) -> [String] -> [[a]] -> [[b]] -> [Test]
+testSames n f ns ass bss = concat $ zipWith3 entry ns ass bss
+  where entry m as bs = testSame (n ++ " " ++ m) (map f as) bs
 
-testAB' :: (Eq b, Show b) => String -> (a -> b)
-                          -> String -> String
-                          -> [a]    -> [a]
-                          -> b      -> b
-                          -> [Test]
-testAB' n f na nb as bs a b =
-    testAB n f na nb as bs (repeat a) (repeat b)
-
-testABC :: (Eq b, Show b) => String -> (a -> b)
-                          -> String -> String -> String
-                          -> [a]    -> [a]    -> [a]
-                          -> [b]    -> [b]    -> [b]
-                          -> [Test]
-testABC n f na nb nc as bs cs as' bs' cs' =
-       testAB n f na nb as bs as' bs'
-    ++ testSame (n ++ " " ++ nc) (map f cs) cs'
-
-testABC' :: (Eq b, Show b) => String -> (a -> b)
-                           -> String -> String -> String
-                           -> [a]    -> [a]    -> [a]
-                           -> b      -> b      -> b  
-                           -> [Test]
-testABC' n f na nb nc as bs cs a b c =
-    testABC n f na nb nc as bs cs (repeat a) (repeat b) (repeat c)
+testSames' :: (Eq b, Show b) => String -> (a -> b) -> [String] -> [[a]] -> [b] -> [Test]
+testSames' n f ns ass bs = testSames n f ns ass
+                           [replicate (length as) b | (as,b) <- zip ass bs]
 
 testNoneSome :: (Ord b, Show b) => String -> (a -> Set b) -> [a] -> [a] -> [[b]] -> [Test]
-testNoneSome n f nones somes rs = testAB n f "none" "some" nones somes
-                                  (repeat empty) (map fromList rs)
+testNoneSome n f nones somes rs = testSames n f ["none","some"] [nones,somes]
+                                  [repeat empty, map fromList rs]
 
 testAllNone :: String -> (a -> Bool) -> [a] -> [a] -> [Test]
-testAllNone n f alls nones = testAB' n f "yes" "no " alls nones True False
+testAllNone n f alls nones = testSames' n f ["yes","no "] [alls,nones] [True,False]

@@ -56,15 +56,15 @@ test_shareFree     = testAllNone "shareFree"     shareFree     sfs nsfs
 test_variationFree = testAllNone "variationFree" variationFree vfs nvfs
 test_plain         = testAllNone "plain"         plain         ps  nps
 
-test_wellDim    = testABC "wellDim" wellDim
-                  "ok" "UndefinedDim" "ChcArityError"
-                  wds (xsv1 : uds) ces
-                  (repeat ok) (repeat (err (UndefinedDim "A")))
-                  [err (ChcArityError d i) | (d,i) <- [("A",1),("B",2),("A",3),("A",1),("A",1)]]
+test_wellDim    = testSames "wellDim" wellDim
+                  ["ok", "UndefinedDim", "ChcArityError"]
+                  [wds, xsv1:uds, ces]
+                  [repeat ok, repeat (err (UndefinedDim "A")),
+                    [err (ChcArityError d i) | (d,i) <- [("A",1),("B",2),("A",3),("A",1),("A",1)]]]
                  
-test_wellRef    = testABC' "wellRef" wellRef
-                  "ok" "UndefinedRef" "RefTypeError"
-                  wrs (xsv2 : uvs) rts
-                  ok (err (UndefinedVar "v")) (err (RefTypeError "v"))
+test_wellRef    = testSames' "wellRef" wellRef
+                  ["ok", "UndefinedRef", "RefTypeError"]
+                  [wrs, xsv2:uvs, rts]
+                  [ok, err (UndefinedVar "v"), err (RefTypeError "v")]
 
 test_wellFormed = testAllNone "wellFormed" isWellFormed wfs nwfs
