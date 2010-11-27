@@ -106,25 +106,24 @@ ccM :: (ExpT e, Monad m) => e -> (forall f. ExpT f => CC f -> m (CC f)) -> Gener
 ccM e f = ccM' (getSubExps e) f
 
 
------------------------
--- Generic Functions --
------------------------
+---------------------
+-- Generic Queries --
+---------------------
 
 -- Execute a query everywhere, stopping recursion when the provided predicate
 -- is satisfied.
-everyUntil :: GenericQ Bool -> GenericQ r -> GenericQ [r]
-everyUntil q f x | q x       = [f x]
-                 | otherwise = f x : concat (gmapQ (everyUntil q f) x)
+queryUntil :: GenericQ Bool -> GenericQ r -> GenericQ [r]
+queryUntil q f x | q x       = [f x]
+                 | otherwise = f x : concat (gmapQ (queryUntil q f) x)
 
 -- Apply a function to every immediate choice calculus subexpression of an
 -- expression and collect the results.
 ccMap :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CC e -> [r]
-ccMap d f (Exp e)     = everyUntil (ccQ e False isCC) (ccQ e d f) e
+ccMap d f (Exp e)     = queryUntil (ccQ e False isCC) (ccQ e d f) e
 ccMap _ f (Dim _ _ e) = [f e]
 ccMap _ f (Chc _ es)  = map f es
 ccMap d f (Let _ b u) = onBnd f b : [f u]
 ccMap d _ (Ref _)     = [d]
-        
 
 -- A list-specific version of ccMap.
 ccConcatMap :: ExpT e => (forall f. ExpT f => CC f -> [r]) -> CC e -> [r]
@@ -141,6 +140,25 @@ ccAll f = and . ccMap True f
 -- A boolean-OR-specific version of ccMap.
 ccAny :: ExpT e => (forall f. ExpT f => CC f -> Bool) -> CC e -> Bool
 ccAny f = or . ccMap False f
+
+
+-----------------------------
+-- Generic Transformations --
+-----------------------------
+
+-- Execute a transformation everywhere, stopping recursion when the provided predicate
+-- is satisfied.
+transUntil :: GenericQ Bool -> GenericT -> GenericT
+transUntil q f x | q x       = f x
+                 | otherwise = gmapT (transUntil q f) x
+
+-- Apply a transformation to every immediate choice calculus subexpression.
+ccTransSubs :: ExpT e => (forall f. ExpT f => CC f -> CC f) -> CC e -> CC e
+ccTransSubs f (Exp e)      = Exp $ transUntil (ccQ e False isCC) (ccT e f) e
+ccTransSubs f (Dim d ts e) = Dim d ts (f e)
+ccTransSubs f (Chc d es)   = Chc d (map f es)
+ccTransSubs f (Let v b u)  = Let v (inBnd f b) (f u)
+ccTransSubs _ (Ref v)      = Ref v
 
 
 ------------------------
