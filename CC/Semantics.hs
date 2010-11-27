@@ -70,10 +70,13 @@ selectAll e (d,ts) = do
 -- The variants of a choice calculus expression.  Removes all dimensions.
 -- Removes all choices if well-dimensioned.
 variants :: ExpT e => CC e -> SemanticsM (Semantics e)
-variants e = do
-    qv <- maybe (return []) (selectAll e) (nextDecl e)
-    vs <- mapM (variants . snd) qv
-    return [(q:qs,e') | (q,v) <- zip (map fst qv) vs, (qs,e') <- v]
+variants e = 
+    case nextDecl e of
+      Nothing -> return [([],e)]
+      Just d -> do
+        qv <- selectAll e d
+        vs <- mapM (variants . snd) qv
+        return [(q:qs,e') | (q,v) <- zip (map fst qv) vs, (qs,e') <- v]
 
 -- Let expansion.  This transformation should only be applied to dimension-free
 -- expressions, otherwise the semantics will be changed.
