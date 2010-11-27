@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module CC.Static where
 
 import Data.Generics

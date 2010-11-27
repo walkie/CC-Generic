@@ -7,6 +7,7 @@
       ScopedTypeVariables,
       TypeFamilies,
       TypeOperators #-}
+
 module CC.Syntax where 
 
 import Control.Monad (liftM,liftM2)
@@ -41,15 +42,15 @@ data Bound = forall e. ExpT e => Bnd (CC e)
   deriving Typeable
 
 -- Execute a query on a bound expression.
-onBnd :: (forall e. ExpT e => CC e -> r) -> Bound -> r
+onBnd :: CCQ r -> Bound -> r
 onBnd f (Bnd b) = f b
 
 -- Execute a transformation in a bound expression.
-inBnd :: (forall e. ExpT e => CC e -> CC e) -> Bound -> Bound
+inBnd :: CCT -> Bound -> Bound
 inBnd f (Bnd b) = Bnd (f b)
 
 -- Execute a monadic transformation in a bound expression.
-inBndM :: Monad m => (forall e. ExpT e => CC e -> m (CC e)) -> Bound -> m Bound
+inBndM :: Monad m => CCM m -> Bound -> m Bound
 inBndM f (Bnd b) = f b >>= return . Bnd
 
 instance Eq Bound where
@@ -74,10 +75,9 @@ data l :> t deriving Typeable
 
 -- build queries and transformations based on type-level lists of subexpression types
 class Typeable t => TypeList t where
-  ccQ' :: t -> r -> (forall u. ExpT u => CC u -> r)        -> GenericQ r
-  ccT' :: t ->      (forall u. ExpT u => CC u -> CC u)     -> GenericT
-  ccM' :: Monad m =>
-          t ->      (forall u. ExpT u => CC u -> m (CC u)) -> GenericM m
+  ccQ' :: t -> r -> CCQ r -> GenericQ r
+  ccT' :: t -> CCT -> GenericT
+  ccM' :: Monad m => t -> CCM m -> GenericM m
 
 instance ExpT t => TypeList (List t) where
   ccQ' _ d f = mkQ d (asTypeOf f (undefined :: CC t -> r))
@@ -93,20 +93,29 @@ instance (ExpT t, TypeList l) => TypeList (l :> t) where
 class (Data e, TypeList (SubExps e), Eq e, Show e) => ExpT e where
   type SubExps e
 
+
+-------------------
+-- Generic Stuff --
+-------------------
+
+type CCQ r = forall e. ExpT e => CC e -> r        -- Generic CC queries
+type CCT   = forall e. ExpT e => CC e -> CC e     -- Generic CC transformations
+type CCM m = forall e. ExpT e => CC e -> m (CC e) -- Generic CC monadic transformations
+
 -- Just used for its type.
 getSubExps :: ExpT e => e -> SubExps e
 getSubExps = undefined
 
 -- Construct a generic query over choice calculus expressions.
-ccQ :: ExpT e => e -> r -> (forall f. ExpT f => CC f -> r) -> GenericQ r
+ccQ :: ExpT e => e -> r -> CCQ r -> GenericQ r
 ccQ e r f = ccQ' (getSubExps e) r f
 
 -- Construct a generic transformation over choice calculus expressions.
-ccT :: ExpT e => e -> (forall f. ExpT f => CC f -> CC f) -> GenericT
+ccT :: ExpT e => e -> CCT -> GenericT
 ccT e f = ccT' (getSubExps e) f
 
 -- Construct a generic monadic transformation over choice calculus expressions.
-ccM :: (ExpT e, Monad m) => e -> (forall f. ExpT f => CC f -> m (CC f)) -> GenericM m
+ccM :: (ExpT e, Monad m) => e -> CCM m -> GenericM m
 ccM e f = ccM' (getSubExps e) f
 
 
@@ -122,7 +131,7 @@ queryUntil q f x | q x       = [f x]
 
 -- Apply a function to every immediate choice calculus subexpression of an
 -- expression and collect the results.
-ccMap :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CC e -> [r]
+ccMap :: ExpT e => r -> CCQ r -> CC e -> [r]
 ccMap d f (Exp e)     = queryUntil (ccQ e False isCC) (ccQ e d f) e
 ccMap _ f (Dim _ _ e) = [f e]
 ccMap _ f (Chc _ es)  = map f es
@@ -130,19 +139,19 @@ ccMap d f (Let _ b u) = onBnd f b : [f u]
 ccMap d _ (Ref _)     = [d]
 
 -- A list-specific version of ccMap.
-ccConcatMap :: ExpT e => (forall f. ExpT f => CC f -> [r]) -> CC e -> [r]
+ccConcatMap :: ExpT e => CCQ [r] -> CC e -> [r]
 ccConcatMap f = concat . ccMap [] f
 
 -- A set-specific version of ccMap.
-ccUnionsMap :: (ExpT e, Ord r) => (forall f. ExpT f => CC f -> Set r) -> CC e -> Set r
+ccUnionsMap :: (ExpT e, Ord r) => CCQ (Set r) -> CC e -> Set r
 ccUnionsMap f = unions . ccMap empty f
 
 -- A boolean-AND-specific version of ccMap.
-ccAll :: ExpT e => (forall f. ExpT f => CC f -> Bool) -> CC e -> Bool
+ccAll :: ExpT e => CCQ Bool -> CC e -> Bool
 ccAll f = and . ccMap True f
 
 -- A boolean-OR-specific version of ccMap.
-ccAny :: ExpT e => (forall f. ExpT f => CC f -> Bool) -> CC e -> Bool
+ccAny :: ExpT e => CCQ Bool -> CC e -> Bool
 ccAny f = or . ccMap False f
 
 
@@ -163,7 +172,7 @@ transUntilM q f x | q x       = f x
                   | otherwise = gmapM (transUntilM q f) x
 
 -- Apply a transformation to every immediate choice calculus subexpression.
-ccTransSubs :: ExpT e => (forall f. ExpT f => CC f -> CC f) -> CC e -> CC e
+ccTransSubs :: ExpT e => CCT -> CC e -> CC e
 ccTransSubs f (Exp e)      = Exp $ transUntil (ccQ e False isCC) (ccT e f) e
 ccTransSubs f (Dim d ts e) = Dim d ts (f e)
 ccTransSubs f (Chc d es)   = Chc d (map f es)
@@ -171,7 +180,7 @@ ccTransSubs f (Let v b u)  = Let v (inBnd f b) (f u)
 ccTransSubs _ (Ref v)      = Ref v
 
 -- Apply a monadic transformation to every immediate choice calculus subexpression.
-ccTransSubsM :: (Monad m, ExpT e) => (forall f. ExpT f => CC f -> m (CC f)) -> CC e -> m (CC e)
+ccTransSubsM :: (Monad m, ExpT e) => CCM m -> CC e -> m (CC e)
 ccTransSubsM f (Exp e)      = liftM Exp $ transUntilM (ccQ e False isCC) (ccM e f) e
 ccTransSubsM f (Dim d ts e) = liftM (Dim d ts) (f e)
 ccTransSubsM f (Chc d es)   = liftM (Chc d) (mapM f es)

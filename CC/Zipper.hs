@@ -1,10 +1,10 @@
 {-# LANGUAGE Rank2Types #-}
--- requires, from Hackage: syz
+
 module CC.Zipper where
 
 import Control.Monad
 import Data.Maybe
-import Data.Generics.Zipper
+import Data.Generics.Zipper -- requires, from Hackage: syz
 
 import CC.Syntax
 
@@ -29,15 +29,15 @@ exit = fromZipper
 --------------------------------
 
 -- Apply a query to the choice calculus expression at the current hole.
-cczQ :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CCZ e -> r
+cczQ :: ExpT e => r -> CCQ r -> CCZ e -> r
 cczQ d f z = query (ccQ (unXCC z) d f) z
 
 -- Apply a transformation to the choice calculus expression at the current hole.
-cczT :: ExpT e => (forall f. ExpT f => CC f -> CC f) -> CCZ e -> CCZ e
+cczT :: ExpT e => CCT -> CCZ e -> CCZ e
 cczT f z = trans (ccT (unXCC z) f) z
 
 -- Apply a monadic transformation to the choice calculus expression at the current hole.
-cczM :: (Monad m, ExpT e) => (forall f. ExpT f => CC f -> m (CC f)) -> CCZ e -> m (CCZ e)
+cczM :: (Monad m, ExpT e) => CCM m -> CCZ e -> m (CCZ e)
 cczM f z = transM (ccM (unXCC z) f) z
 
 
@@ -46,7 +46,7 @@ cczM f z = transM (ccM (unXCC z) f) z
 -------------
 
 -- Boolean version of cczQ, asking am I at a location that satisfies the query?
-atCC :: ExpT e => (forall f. ExpT f => CC f -> Bool) -> CCZ e -> Bool
+atCC :: ExpT e => CCQ Bool -> CCZ e -> Bool
 atCC = cczQ False
 
 -- Is the current hole at a specific syntactic category?
@@ -89,7 +89,7 @@ inAlt i | i >= 0    = foldl (>=>) down' (replicate (i+1) right)
         | otherwise = const Nothing
 
 -- Find the next matching location using a preorder traversal.
-match :: ExpT e => (forall f. ExpT f => CC f -> Bool) -> Move e
+match :: ExpT e => CCQ Bool -> Move e
 match f z | atCC f z  = Just z
           | otherwise = case down' z >>= match f of
                           Nothing -> tryRight
