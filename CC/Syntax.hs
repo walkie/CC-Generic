@@ -40,12 +40,15 @@ data CC e =
 data Bound = forall e. ExpT e => Bnd (CC e)
   deriving Typeable
 
+-- Execute a query on a bound expression.
 onBnd :: (forall e. ExpT e => CC e -> r) -> Bound -> r
 onBnd f (Bnd b) = f b
 
+-- Execute a transformation in a bound expression.
 inBnd :: (forall e. ExpT e => CC e -> CC e) -> Bound -> Bound
 inBnd f (Bnd b) = Bnd (f b)
 
+-- Execute a monadic transformation in a bound expression.
 inBndM :: Monad m => (forall e. ExpT e => CC e -> m (CC e)) -> Bound -> m Bound
 inBndM f (Bnd b) = f b >>= return . Bnd
 
