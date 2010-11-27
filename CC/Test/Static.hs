@@ -22,6 +22,9 @@ tests = $(testGroupGenerator)
      ++ test_shareFree
      ++ test_variationFree
      ++ test_plain
+     ++ test_wellDim
+     ++ test_wellRef
+     ++ test_wellFormed
      ++ []
 
 runTests = defaultMain tests
@@ -39,11 +42,11 @@ test_boundVars = testNoneSome "boundVars" boundVars bfs nbfs
                   v,v,v,v]   -- svs ++ xsvs
   where { v = ["v"]; uv = ["u","v"] }
 
-test_freeDims = testNoneSome "freeDims" freeDims (xsv2 : wfs ++ nwrs) (xsv1 : uds)
-                (replicate 4 ["A"])
+test_freeDims = testNoneSome "freeDims" freeDims (wfs ++ nwrs) (xsv1 : uds)
+                (repeat ["A"])
 
-test_freeVars = testNoneSome "freeVars" freeVars (wfs ++ nwds) uvs
-                (replicate 4 ["v"])
+test_freeVars = testNoneSome "freeVars" freeVars (wfs ++ nwds) (xsv2 : uvs)
+                (repeat ["v"])
 
 test_bindFree      = testAllNone "bindFree"      bindFree      bfs nbfs
 test_refFree       = testAllNone "refFree"       refFree       rfs nrfs
@@ -52,3 +55,16 @@ test_choiceFree    = testAllNone "choiceFree"    choiceFree    cfs ncfs
 test_shareFree     = testAllNone "shareFree"     shareFree     sfs nsfs
 test_variationFree = testAllNone "variationFree" variationFree vfs nvfs
 test_plain         = testAllNone "plain"         plain         ps  nps
+
+test_wellDim    = testABC "wellDim" wellDim
+                  "ok" "UndefinedDim" "ChcArityError"
+                  wds (xsv1 : uds) ces
+                  (repeat ok) (repeat (err (UndefinedDim "A")))
+                  [err (ChcArityError d i) | (d,i) <- [("A",1),("B",2),("A",3),("A",1),("A",1)]]
+                 
+test_wellRef    = testABC' "wellRef" wellRef
+                  "ok" "UndefinedRef" "RefTypeError"
+                  wrs (xsv2 : uvs) rts
+                  ok (err (UndefinedVar "v")) (err (RefTypeError "v"))
+
+test_wellFormed = testAllNone "wellFormed" isWellFormed wfs nwfs
