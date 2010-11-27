@@ -1,16 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module CC.Test.Static where
 
-import Test.Framework
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2 -- requires QuickCheck-2.1.1.1
-import Test.HUnit
-import Test.QuickCheck
-
-import Data.Set (empty,fromList)
-
 import CC
+import CC.Test
 import CC.Test.Expressions
 
 
@@ -33,24 +25,6 @@ tests = $(testGroupGenerator)
      ++ []
 
 runTests = defaultMain tests
-
--- There are two implementations of this function.  The first condenses all
--- cases into a single test, which makes for nicer test output.  The second
--- runs each case separately, which is useful for debugging a failed test
-testSame n as es = [testCase n $ as @?= take (length as) es]
-{-
-testSame n as es = zipWith testCase names (zipWith (@?=) as es)
-  where names = [n ++ ' ' : show i | i <- [0..]]
--}
-
-testNoneSome n f nones somes rs =
-       testSame (n ++ " none") (map f nones) (repeat empty)
-    ++ testSame (n ++ " some") (map f somes) (map fromList rs)
-
-testAllNone n f alls nones =
-       testSame (n ++ " yes") (map f alls)  (repeat True)
-    ++ testSame (n ++ " no ") (map f nones) (repeat False)
-
 
 test_boundDims = testNoneSome "boundDims" boundDims dfs ndfs
                  [a,ab,                -- ud2,ud3
