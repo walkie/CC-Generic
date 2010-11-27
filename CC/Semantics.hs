@@ -25,8 +25,8 @@ type Decision = [QTag]
 selectTag :: ExpT e => CC e -> QTag -> SemanticsM (CC e)
 selectTag e (d,t) = do
     z <- maybeErr (noMatchingDim d) $ match dimMatch (enter e)
-    i <- maybeErr (noMatchingTag t) $ ccQuery Nothing getTags z >>= elemIndex t
-    liftM exit $ ccTransM (choiceElim (d,i) . dimElim) z
+    i <- maybeErr (noMatchingTag t) $ cczQ Nothing getTags z >>= elemIndex t
+    liftM exit $ cczM (ccTransSubsM (choiceElim (d,i) . dimElim)) z
   where dimElim  (Dim _ _ e) = e
         dimMatch (Dim x _ _) = d == x
         dimMatch _           = False
@@ -38,7 +38,7 @@ choiceElim (d,_) e@(Dim d' _ _) | d == d' = return e
 choiceElim (d,i)   (Chc d' es)  | d == d' = if i < length es
                                             then throwError (noAlternative i)
                                             else choiceElim (d,i) (es !! i)
-choiceElim s e = transformSubsM (choiceElim s) e
+choiceElim s e = ccTransSubsM (choiceElim s) e
 
 -- Make a decision by applying each selection in order.
 decide :: ExpT e => CC e -> Decision -> SemanticsM (CC e)
@@ -58,7 +58,7 @@ type Semantics e = Map Decision (CC e)
 
 -- Get the next dimension declaration, in a pre-order traversal.
 nextDecl :: ExpT e => CC e -> Maybe Decl
-nextDecl e = match isDim (enter e) >>= ccQuery Nothing getDecl
+nextDecl e = match isDim (enter e) >>= cczQ Nothing getDecl
 
 -- Select each tag in a dimension declaration.
 selectAll :: ExpT e => CC e -> Decl -> SemanticsM (Map QTag (CC e))
@@ -82,7 +82,7 @@ letExp m (Let v b u) = do b' <- inBndM (letExp m) b
                           letExp ((v,b'):m) u
 letExp m (Ref v) = do Bnd b <- maybeErr (undefinedVar v) (lookup v m)
                       maybeErr (refTypeError v) (cast b)
-letExp m e = transformSubsM (letExp m) e
+letExp m e = ccTransSubsM (letExp m) e
 
 -- If well-formed, provides a mapping from decisions to plain expressions.
 semantics :: ExpT e => CC e -> SemanticsM (Semantics e)

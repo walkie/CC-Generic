@@ -29,45 +29,25 @@ exit = fromZipper
 --------------------------------
 
 -- Apply a query to the choice calculus expression at the current hole.
-ccQuery :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CCZ e -> r
-ccQuery d f z = query (ccQ (unXCC z) d f) z
+cczQ :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CCZ e -> r
+cczQ d f z = query (ccQ (unXCC z) d f) z
 
 -- Apply a transformation to the choice calculus expression at the current hole.
-ccTrans :: ExpT e => (forall f. ExpT f => CC f -> CC f) -> CCZ e -> CCZ e
-ccTrans f z = trans (ccT (unXCC z) f) z
+cczT :: ExpT e => (forall f. ExpT f => CC f -> CC f) -> CCZ e -> CCZ e
+cczT f z = trans (ccT (unXCC z) f) z
 
 -- Apply a monadic transformation to the choice calculus expression at the current hole.
-ccTransM :: (Monad m, ExpT e) => (forall f. ExpT f => CC f -> m (CC f)) -> CCZ e -> m (CCZ e)
-ccTransM f z = transM (ccM (unXCC z) f) z
-
--- Apply a query to the immediate subexpressions of the current expression.
-ccQuerySubs :: ExpT e => r -> (forall f. ExpT f => CC f -> r) -> CCZ e -> [r]
-ccQuerySubs d f z = zmapQ (ccQ (unXCC z) d f) z
-
--- Apply a transformation to the immediate subexpressions of the current expression.
-ccTransSubs :: ExpT e => (forall f. ExpT f => CC f -> CC f) -> CCZ e -> CCZ e
-ccTransSubs f z = zmapT (ccT (unXCC z) f) z
-
--- Apply a monadic transformation to the immediate subexpressions of the current expression.
-ccTransSubsM :: (Monad m, ExpT e) => (forall f. ExpT f => CC f -> m (CC f)) -> CCZ e -> m (CCZ e)
-ccTransSubsM f z = zmapM (ccM (unXCC z) f) z
-
--- Recursively apply a transformation to the immediate subexpressions of this expression.
-transformSubs :: ExpT e => (forall f. ExpT f => CC f -> CC f) -> CC e -> CC e
-transformSubs f e = exit (ccTransSubs f (enter e))
-
--- Recursively apply a monadic transformation to the immediate subexpressions of this expression.
-transformSubsM :: (Monad m, ExpT e) => (forall f. ExpT f => CC f -> m (CC f)) -> CC e -> m (CC e)
-transformSubsM f e = ccTransSubsM f (enter  e) >>= return . exit
+cczM :: (Monad m, ExpT e) => (forall f. ExpT f => CC f -> m (CC f)) -> CCZ e -> m (CCZ e)
+cczM f z = transM (ccM (unXCC z) f) z
 
 
 -------------
 -- Queries --
 -------------
 
--- Boolean version of ccQuery, asking am I at a location that satisfies the query?
+-- Boolean version of cczQ, asking am I at a location that satisfies the query?
 atCC :: ExpT e => (forall f. ExpT f => CC f -> Bool) -> CCZ e -> Bool
-atCC = ccQuery False
+atCC = cczQ False
 
 -- Is the current hole at a specific syntactic category?
 atExp, atDim, atChc, atLet, atRef :: ExpT e => CCZ e -> Bool
@@ -127,4 +107,4 @@ type TransM e = CCZ e -> Maybe (CCZ e)
 
 -- Create a new dimension at the current location.
 newDim :: ExpT e => Dim -> [Tag] -> Trans e
-newDim d ts = ccTrans (Dim d ts)
+newDim d ts = cczT (Dim d ts)

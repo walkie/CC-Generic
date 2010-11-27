@@ -9,6 +9,7 @@
       TypeOperators #-}
 module CC.Syntax where 
 
+import Control.Monad (liftM,liftM2)
 import Data.Generics
 import Data.Set (Set,empty,unions)
 
@@ -146,11 +147,17 @@ ccAny f = or . ccMap False f
 -- Generic Transformations --
 -----------------------------
 
--- Execute a transformation everywhere, stopping recursion when the provided predicate
--- is satisfied.
+-- Execute a transformation everywhere, stopping recursion when the provided
+-- predicate is satisfied.
 transUntil :: GenericQ Bool -> GenericT -> GenericT
 transUntil q f x | q x       = f x
                  | otherwise = gmapT (transUntil q f) x
+
+-- Execute a monadic transformation everywhere, stopping recursion when the
+-- provided predicate is satisfied.
+transUntilM :: Monad m => GenericQ Bool -> GenericM m -> GenericM m
+transUntilM q f x | q x       = f x
+                  | otherwise = gmapM (transUntilM q f) x
 
 -- Apply a transformation to every immediate choice calculus subexpression.
 ccTransSubs :: ExpT e => (forall f. ExpT f => CC f -> CC f) -> CC e -> CC e
@@ -159,6 +166,14 @@ ccTransSubs f (Dim d ts e) = Dim d ts (f e)
 ccTransSubs f (Chc d es)   = Chc d (map f es)
 ccTransSubs f (Let v b u)  = Let v (inBnd f b) (f u)
 ccTransSubs _ (Ref v)      = Ref v
+
+-- Apply a monadic transformation to every immediate choice calculus subexpression.
+ccTransSubsM :: (Monad m, ExpT e) => (forall f. ExpT f => CC f -> m (CC f)) -> CC e -> m (CC e)
+ccTransSubsM f (Exp e)      = liftM Exp $ transUntilM (ccQ e False isCC) (ccM e f) e
+ccTransSubsM f (Dim d ts e) = liftM (Dim d ts) (f e)
+ccTransSubsM f (Chc d es)   = liftM (Chc d) (mapM f es)
+ccTransSubsM f (Let v b u)  = liftM2 (Let v) (inBndM f b) (f u)
+ccTransSubsM _ (Ref v)      = return (Ref v)
 
 
 ------------------------
