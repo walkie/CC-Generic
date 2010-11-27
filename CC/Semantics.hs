@@ -26,7 +26,7 @@ selectTag :: ExpT e => CC e -> QTag -> SemanticsM (CC e)
 selectTag e (d,t) = do
     z <- maybeErr (noMatchingDim d) $ match dimMatch (enter e)
     i <- maybeErr (noMatchingTag t) $ cczQ Nothing getTags z >>= elemIndex t
-    liftM exit $ cczM (ccTransSubsM (choiceElim (d,i) . dimElim)) z
+    liftM exit $ cczM (choiceElim (d,i) . dimElim) z
   where dimElim  (Dim _ _ e) = e
         dimMatch (Dim x _ _) = d == x
         dimMatch _           = False
@@ -35,7 +35,7 @@ selectTag e (d,t) = do
 -- with their ith alternative. Used in tag selection and the choice semantics.
 choiceElim :: ExpT e => Selector -> CC e -> SemanticsM (CC e)
 choiceElim (d,_) e@(Dim d' _ _) | d == d' = return e
-choiceElim (d,i)   (Chc d' es)  | d == d' = if i < length es
+choiceElim (d,i)   (Chc d' es)  | d == d' = if i < 0 || i >= length es
                                             then throwError (noAlternative i)
                                             else choiceElim (d,i) (es !! i)
 choiceElim s e = ccTransSubsM (choiceElim s) e
