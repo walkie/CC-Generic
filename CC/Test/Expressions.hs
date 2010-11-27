@@ -131,16 +131,20 @@ v6 = dimA $ Chc "A" [dimB cb, leaf 5]
 v7 = dimA $ node 0 [ca1, dimA ca2]
 
 -- not well-dim'ed
-xvs = uds ++ ces
+xvs = [ud1,ud2,ud3] ++ ces
 
 -- undefined dims
-uds = [ud1,ud2,ud3]
+uds = [ud1,ud2,ud3,xsv1]
+udsEs = replicate 4 (err (UndefinedDim "A"))
+
 ud1 = ca1
 ud2 = node 0 [dimA b1, ca1]
 ud3 = dimB $ Chc "B" [dimA b1, ca1, leaf 3]
 
 -- choice arity error
 ces = [ce1,ce2,ce3,ce4,ce5]
+cesEs = [err (ChcArityError d i) | (d,i) <- [("A",1),("B",2),("A",3),("A",1),("A",1)]]
+
 ce1 = dimA $ Chc "A" [b1]
 ce2 = dimB $ Chc "B" [b1, leaf 2]
 ce3 = dimA $ Chc "A" [b1, leaf 2, leaf 3]

@@ -61,9 +61,8 @@ test_plain         = testAllNone "plain"         plain         ps  nps
 
 test_wellDim    = testSames "wellDim" wellDim
                   ["ok", "UndefinedDim", "ChcArityError"]
-                  [wds, xsv1:uds, ces]
-                  [repeat ok, repeat (err (UndefinedDim "A")),
-                    [err (ChcArityError d i) | (d,i) <- [("A",1),("B",2),("A",3),("A",1),("A",1)]]]
+                  [wds, uds, ces]
+                  [repeat ok, udsEs, cesEs]
                  
 test_wellRef    = testSames' "wellRef" wellRef
                   ["ok", "UndefinedRef", "RefTypeError"]
