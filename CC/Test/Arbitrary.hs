@@ -1,12 +1,7 @@
 {-# LANGUAGE TemplateHaskell, TypeSynonymInstances, ScopedTypeVariables #-}
 module CC.Test.Arbitrary where
 
-import Test.Framework
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2 -- requires QuickCheck-2.1.1.1
-import Test.HUnit
-import Test.QuickCheck
+import CC.Test
 
 import CC.Arbitrary
 import CC.Error
