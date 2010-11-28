@@ -62,7 +62,7 @@ test_plain         = testAllNone "plain"         plain         ps  nps
 test_wellDim    = testSames "wellDim" wellDim
                   ["ok", "UndefinedDim", "ChcArityError"]
                   [wds, uds, ces]
-                  [repeat ok, udsEs, cesEs]
+                  [repeat ok, map err udsEs, map err cesEs]
                  
 test_wellRef    = testSames' "wellRef" wellRef
                   ["ok", "UndefinedRef", "RefTypeError"]

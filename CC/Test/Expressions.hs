@@ -125,8 +125,8 @@ v2 = dimA $ node 0 [ca1, ca2]
 v3 = dimA $ dimB $ node 0 [ca1,cb]
 v4 = node 0 [dimA ca1, dimB cb]
 
-v5 = dimA $ dimB $ Chc "A" [cb, leaf 5]
-v6 = dimA $ Chc "A" [dimB cb, leaf 5]
+v5 = dimA $ dimB $ Chc "A" [cb, leaf 6]
+v6 = dimA $ Chc "A" [dimB cb, leaf 6]
 
 v7 = dimA $ node 0 [ca1, dimA ca2]
 
@@ -135,7 +135,7 @@ xvs = [ud1,ud2,ud3] ++ ces
 
 -- undefined dims
 uds = [ud1,ud2,ud3,xsv1]
-udsEs = replicate 4 (err (UndefinedDim "A"))
+udsEs = replicate 4 (UndefinedDim "A")
 
 ud1 = ca1
 ud2 = node 0 [dimA b1, ca1]
@@ -143,7 +143,7 @@ ud3 = dimB $ Chc "B" [dimA b1, ca1, leaf 3]
 
 -- choice arity error
 ces = [ce1,ce2,ce3,ce4,ce5]
-cesEs = [err (ChcArityError d i) | (d,i) <- [("A",1),("B",2),("A",3),("A",1),("A",1)]]
+cesEs = [ChcArityError d i | (d,i) <- [("A",1),("B",2),("A",3),("A",1),("A",1)]]
 
 ce1 = dimA $ Chc "A" [b1]
 ce2 = dimB $ Chc "B" [b1, leaf 2]
@@ -157,7 +157,7 @@ ce5 = dimA $ Chc "A" [Chc "A" [b1], leaf 2]
 
 svs = [sv1,sv2]
 sv1 = Let "v" (Bnd v1) $ node 0 [Ref "v", Ref "v"] :: TreeCC Int
-sv2 = dimA $ Let "v" (Bnd ca1) $ dimA $ Chc "A" [ca1, Ref "v"]
+sv2 = dimA $ Let "v" (Bnd ca1) $ dimA $ Chc "A" [ca2, Ref "v"]
 
 -- not well-formed
 xsvs = [xsv1,xsv2]
