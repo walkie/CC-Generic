@@ -89,3 +89,7 @@ noAlternative = SelectionError . NoAlternative
 
 maybeErr :: MonadError e m => e -> Maybe a -> m a
 maybeErr e = maybe (throwError e) return
+
+noErrors :: SemanticsM a -> a
+noErrors (Right a) = a
+noErrors (Left e)  = error (show e)
