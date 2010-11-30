@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -cpp #-} -- -DTERSE #-}
+{-# OPTIONS_GHC -cpp -DTERSE #-}
 
 module CC.Test (
     module Test.Framework,
