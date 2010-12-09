@@ -106,17 +106,35 @@ type CCM m = forall e. ExpT e => CC e -> m (CC e) -- Generic CC monadic transfor
 getSubExps :: ExpT e => e -> SubExps e
 getSubExps = undefined
 
--- Construct a generic query over choice calculus expressions.
+-- Construct a generic query over choice calculus expressions
+-- of all subexpression types.
 ccQ :: ExpT e => e -> r -> CCQ r -> GenericQ r
 ccQ e r f = ccQ' (getSubExps e) r f
 
--- Construct a generic transformation over choice calculus expressions.
+-- Construct a generic transformation over choice calculus expressions
+-- of all subexpression types.
 ccT :: ExpT e => e -> CCT -> GenericT
 ccT e f = ccT' (getSubExps e) f
 
--- Construct a generic monadic transformation over choice calculus expressions.
+-- Construct a generic monadic transformation over choice calculus expressions
+-- of all subexpression types.
 ccM :: (ExpT e, Monad m) => e -> CCM m -> GenericM m
 ccM e f = ccM' (getSubExps e) f
+
+-- Construct a generic query over choice calculus expressions
+-- from a type-specific one.
+mkCCQ :: (ExpT e, ExpT f) => r -> (CC e -> r) -> CC f -> r
+mkCCQ = mkQ
+
+-- Construct a generic transformation over choice calculus expressions
+-- from a type-specific one.
+mkCCT :: (ExpT e, ExpT f) => (CC e -> CC e) -> CC f -> CC f
+mkCCT = mkT
+
+-- Construct a generic monadic transformation over choice calculus expressions
+-- from a type-specific one.
+mkCCM :: (Monad m, ExpT e, ExpT f) => (CC e -> m (CC e)) -> CC f -> m (CC f)
+mkCCM = mkM
 
 
 ---------------------
