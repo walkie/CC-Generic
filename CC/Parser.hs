@@ -32,6 +32,9 @@ class TreeVal a => ReadCC a where
 instance ReadCC Int where
   readCC = integer >>= return . fromInteger
 
+instance ReadCC Bool where
+  readCC = (string "True" >> return True) <|> (string "False" >> return False)
+
 instance ReadCC String where
   -- this is kind of a hacky solution, but works for the most part
   -- when in doubt, parenthesize expressions and you should be good
