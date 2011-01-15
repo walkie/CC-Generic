@@ -1,5 +1,8 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
+-- see comment on variability in CC.hs
+{-# OPTIONS_GHC -cpp #-} -- -DSHARING_SEPARABLE -DSHARING_EARLY #-}
+
 module CC.Pretty where
 
 import Control.Monad.State
@@ -65,7 +68,12 @@ cc :: ExpT e => CC e -> Pretty String
 cc (Exp e)     = return (show e)
 cc (Chc d es)  = cat [dim d, (bracks . commas op) (map cc es)]
 cc (Dim d t e) = cat [key "dim ", dim d, (bracks . commas op) (map tag t), key " in ", parens (cc e)]
+#ifdef SHARING_SEPARABLE
+cc (Abs v u)   = cat [op "\\", var v, op ".", parens (cc u)]
+cc (App l b)   = cat [parens (cc l), op " ", parens (onBnd cc b)]
+#else
 cc (Let v b u) = cat [key "let ", var v, op " = ", parens (onBnd cc b), key " in ", parens (cc u)]
+#endif
 cc (Ref v)     = var v
 
 

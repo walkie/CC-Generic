@@ -1,3 +1,6 @@
+-- see comment on variability in CC.hs
+{-# OPTIONS_GHC -cpp #-} -- -DSHARING_SEPARABLE -DSHARING_EARLY #-}
+
 module CC.Static where
 
 import Data.Generics
@@ -22,7 +25,11 @@ boundDims e           = ccUnionsMap boundDims e
 
 -- set of bound variables
 boundVars :: ExpT e => CC e -> Set Var
+#ifdef SHARING_SEPARABLE
+boundVars (Abs v e)   = S.insert v (boundVars e)
+#else
 boundVars (Let v b e) = S.insert v (onBnd boundVars b `S.union` boundVars e)
+#endif
 boundVars e           = ccUnionsMap boundVars e
 
 -- set of free dimensions
@@ -33,7 +40,11 @@ freeDims e           = ccUnionsMap freeDims e
 
 -- set of free variables
 freeVars :: ExpT e => CC e -> Set Var
+#ifdef SHARING_SEPARABLE
+freeVars (Abs v e)   = S.delete v (freeVars e)
+#else
 freeVars (Let v b e) = S.delete v (freeVars e) `S.union` onBnd freeVars b
+#endif
 freeVars (Ref v)     = S.singleton v
 freeVars e           = ccUnionsMap freeVars e
 
@@ -56,10 +67,22 @@ safeDim d = safeName d . freeDims
 -- X-Free and Plainness --
 --------------------------
 
+#ifdef SHARING_SEPARABLE
+-- is the expression abstraction free?
+absFree :: ExpT e => CC e -> Bool
+absFree (Abs _ _) = False
+absFree e         = ccAll absFree e
+
+-- is the expression application free?
+appFree :: ExpT e => CC e -> Bool
+appFree (Abs _ _) = False
+appFree e         = ccAll appFree e
+#else
 -- is the expression binding free?
 bindFree :: ExpT e => CC e -> Bool
 bindFree (Let _ _ _) = False
 bindFree e           = ccAll bindFree e
+#endif
 
 -- is the expression reference free?
 refFree :: ExpT e => CC e -> Bool
@@ -78,7 +101,11 @@ choiceFree e         = ccAll choiceFree e
 
 -- is the expression sharing free?
 shareFree :: ExpT e => CC e -> Bool
+#ifdef SHARING_SEPARABLE
+shareFree e = absFree e && appFree e && refFree e
+#else
 shareFree e = bindFree e && refFree e
+#endif
 
 -- is the expression variation free?
 variationFree :: ExpT e => CC e -> Bool
@@ -112,7 +139,12 @@ wellRef = well []
   where tryCast :: ExpT e => CC e -> Bound -> Maybe (CC e)
         tryCast _ (Bnd b) = cast b 
         well :: ExpT e => Map Var Bound -> CC e -> WellRef
+#ifdef SHARING_SEPARABLE
+        -- TODO generalize this!
+        well m (App (Abs v u) b) = checkAll [onBnd (well m) b, well ((v,b):m) u]
+#else
         well m (Let v b u) = checkAll [onBnd (well m) b, well ((v,b):m) u]
+#endif
         well m e@(Ref v)   = case lookup v m of
           Nothing -> err (UndefinedVar v)
           Just b  -> maybe (err (RefTypeError v)) (const ok) (tryCast e b)

@@ -8,6 +8,9 @@
       TypeFamilies,
       TypeOperators #-}
 
+-- see comment on variability in CC.hs
+{-# OPTIONS_GHC -cpp #-} -- -DSHARING_SEPARABLE -DSHARING_EARLY #-}
+
 module CC.Syntax where 
 
 import Control.Monad (liftM,liftM2)
@@ -29,7 +32,12 @@ data CC e =
     Exp e                 -- subexpressions
   | Dim Dim [Tag] (CC e)  -- dimension declaration
   | Chc Dim [CC e]        -- choice branching
+#ifdef SHARING_SEPARABLE
+  | Abs Var (CC e)
+  | App (CC e) Bound
+#else
   | Let Var Bound (CC e)  -- variable binding
+#endif
   | Ref Var               -- variable reference
   deriving (Eq,Data,Typeable)
 
@@ -153,7 +161,12 @@ ccMap :: ExpT e => r -> CCQ r -> CC e -> [r]
 ccMap d f (Exp e)     = queryUntil (ccQ e False isCC) (ccQ e d f) e
 ccMap _ f (Dim _ _ e) = [f e]
 ccMap _ f (Chc _ es)  = map f es
-ccMap d f (Let _ b u) = onBnd f b : [f u]
+#ifdef SHARING_SEPARABLE
+ccMap _ f (Abs _ u)   = [f u]
+ccMap _ f (App l b)   = f l : [onBnd f b]
+#else
+ccMap _ f (Let _ b u) = onBnd f b : [f u]
+#endif
 ccMap d _ (Ref _)     = [d]
 
 -- A list-specific version of ccMap.
@@ -194,7 +207,12 @@ ccTransSubs :: ExpT e => CCT -> CC e -> CC e
 ccTransSubs f (Exp e)      = Exp $ transUntil (ccQ e False isCC) (ccT e f) e
 ccTransSubs f (Dim d ts e) = Dim d ts (f e)
 ccTransSubs f (Chc d es)   = Chc d (map f es)
+#ifdef SHARING_SEPARABLE
+ccTransSubs f (Abs v u)    = Abs v (f u)
+ccTransSubs f (App l b)    = App (f l) (inBnd f b)
+#else
 ccTransSubs f (Let v b u)  = Let v (inBnd f b) (f u)
+#endif
 ccTransSubs _ (Ref v)      = Ref v
 
 -- Apply a monadic transformation to every immediate choice calculus subexpression.
@@ -202,7 +220,12 @@ ccTransSubsM :: (Monad m, ExpT e) => CCM m -> CC e -> m (CC e)
 ccTransSubsM f (Exp e)      = liftM Exp $ transUntilM (ccQ e False isCC) (ccM e f) e
 ccTransSubsM f (Dim d ts e) = liftM (Dim d ts) (f e)
 ccTransSubsM f (Chc d es)   = liftM (Chc d) (mapM f es)
+#ifdef SHARING_SEPARABLE
+ccTransSubsM f (Abs v u)    = liftM (Abs v) (f u)
+ccTransSubsM f (App l b)    = liftM2 App (f l) (inBndM f b)
+#else
 ccTransSubsM f (Let v b u)  = liftM2 (Let v) (inBndM f b) (f u)
+#endif
 ccTransSubsM _ (Ref v)      = return (Ref v)
 
 
@@ -229,15 +252,24 @@ isCC :: CC e -> Bool
 isCC _ = True
 
 -- true if the top node is of the corresponding syntactic category
-isExp, isDim, isChc, isLet, isRef :: CC e -> Bool
+isExp, isDim, isChc, isRef :: CC e -> Bool
 isExp (Exp _)     = True
 isExp _           = False
 isDim (Dim _ _ _) = True
 isDim _           = False
 isChc (Chc _ _)   = True
 isChc _           = False
+#ifdef SHARING_SEPARABLE
+isAbs, isApp :: CC e -> Bool
+isAbs (Abs _ _) = True
+isAbs _         = False
+isApp (App _ _) = False
+isApp _         = False
+#else
+isLet :: CC e -> Bool
 isLet (Let _ _ _) = True
 isLet _           = False
+#endif
 isRef (Ref _)     = True
 isRef _           = False
 
@@ -264,6 +296,10 @@ getAlts _          = Nothing
 
 -- get the variable name at this node, if applicable
 getVar :: CC e -> Maybe Var
+#ifdef SHARING_SEPARABLE
+getVar (Abs v _)   = Just v
+#else
 getVar (Let v _ _) = Just v
+#endif
 getVar (Ref v)     = Just v
 getVar _           = Nothing
