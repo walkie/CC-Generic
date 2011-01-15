@@ -112,7 +112,7 @@ semantics e = do
     -- perform well-formedness checking first
     maybe (return ()) (throwError . NotWellFormed) (wellFormed e)
 #ifdef SHARING_EARLY
-    return $ variants (expand [] e)
+    expand [] e >>= variants
 #else
     vs <- variants e
     es <- mapM (expand []) (map snd vs)
