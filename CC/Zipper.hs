@@ -1,8 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
 
--- see comment on variability in CC.hs
-{-# OPTIONS_GHC -cpp #-} -- -DSHARING_SEPARABLE -DSHARING_EARLY #-}
-
 module CC.Zipper where
 
 import Control.Monad
@@ -53,18 +50,11 @@ atCC :: ExpT e => CCQ Bool -> CCZ e -> Bool
 atCC = cczQ False
 
 -- Is the current hole at a specific syntactic category?
-atExp, atDim, atChc, atRef :: ExpT e => CCZ e -> Bool
+atExp, atDim, atChc, atLet, atRef :: ExpT e => CCZ e -> Bool
 atExp = atCC isExp
 atDim = atCC isDim
 atChc = atCC isChc
-#ifdef SHARING_SEPARABLE
-atAbs, atApp :: ExpT e => CCZ e -> Bool
-atAbs = atCC isAbs
-atApp = atCC isApp
-#else
-atLet :: ExpT e => CCZ e -> Bool
 atLet = atCC isLet
-#endif
 atRef = atCC isRef
 
 -- Are we at the top/bottom/leftEnd/rightEnd of the expression?
@@ -87,19 +77,11 @@ moveIf test move z | test z    = move z
                    | otherwise = Nothing
 
 -- Move into a subexpression, dimension declaration, let-binding, or let-use.
-inExp, inDim :: ExpT e => Move e
+inExp, inDim, inBind, inUse :: ExpT e => Move e
 inExp  = moveIf atExp down
 inDim  = moveIf atDim down
-#ifdef SHARING_SEPARABLE
-inAbs, inAppR, inAppL :: ExpT e => Move e
-inAbs  = moveIf atAbs down
-inAppR = moveIf atApp down
-inAppL = moveIf atApp (down >=> left)
-#else
-inBind, inUse :: ExpT e => Move e
 inBind = moveIf atLet (down >=> left)
 inUse  = moveIf atLet down
-#endif
 
 -- Move into a particular (indexed) alternative.
 inAlt :: ExpT e => Int -> Move e

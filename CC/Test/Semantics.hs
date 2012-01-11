@@ -11,7 +11,7 @@ import CC.Test.Expressions
 -----------------------
 
 tests = test_selectTag
-     ++ test_expand
+     ++ test_letExp
      ++ test_semantics
      ++ []
 
@@ -24,8 +24,8 @@ runTests = defaultMain tests
 
 test_selectTag = [] --testSame "selectTag" [selectTag e q | (e,q) <- 
 
-test_expand =
-    testSames "expand" (expand []) ["none ","good","undefVar","typeErr"]
+test_letExp =
+    testSames "letExp" (letExp []) ["none ","good","undefVar","typeErr"]
     [bs, ss, xsv2:uvs, rts]
     [map Right bs, map Right ss', repeat (Left (undefinedVar "v")), repeat (Left (refTypeError "v"))]
 

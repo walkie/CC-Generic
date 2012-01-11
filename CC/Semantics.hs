@@ -1,8 +1,5 @@
 {-# LANGUAGE TupleSections #-}
 
--- see comment on variability in CC.hs
-{-# OPTIONS_GHC -cpp #-} -- -DSHARING_SEPARABLE -DSHARING_EARLY #-}
-
 module CC.Semantics where
 
 import Control.Monad
@@ -81,40 +78,20 @@ variants e =
         vs <- mapM (variants . snd) qv
         return [(q:qs,e') | (q,v) <- zip (map fst qv) vs, (qs,e') <- v]
 
--- Sharing expansion.
-#ifndef SHARING_EARLY
--- This transformation should only be applied to dimension-free
+-- Let expansion.  This transformation should only be applied to dimension-free
 -- expressions, otherwise the semantics will be changed.
-#endif
-expand :: ExpT e => Map Var Bound -> CC e -> SemanticsM (CC e)
-#ifdef SHARING_SEPARABLE
--- TODO generalize
-expand m (App (Abs v u) b) = do
-#else
-expand m (Let v b u) = do
-#endif
-    b' <- inBndM (expand m) b
-    expand ((v,b'):m) u
-expand m (Ref v) = do
-#ifdef SHARING_SEPARABLE
-    case lookup v m of
-      Just (Bnd b) -> maybeErr (refTypeError v) (cast b)
-      Nothing      -> Right (Ref v)
-#else
-    Bnd b <- maybeErr (undefinedVar v) (lookup v m)
-    maybeErr (refTypeError v) (cast b)
-#endif
-expand m e = ccTransSubsM (expand m) e
+letExp :: ExpT e => Map Var Bound -> CC e -> SemanticsM (CC e)
+letExp m (Let v b u) = do b' <- inBndM (letExp m) b
+                          letExp ((v,b'):m) u
+letExp m (Ref v) = do Bnd b <- maybeErr (undefinedVar v) (lookup v m)
+                      maybeErr (refTypeError v) (cast b)
+letExp m e = ccTransSubsM (letExp m) e
 
 -- If well-formed, provides a mapping from decisions to plain expressions.
 semantics :: ExpT e => CC e -> SemanticsM (Semantics e)
 semantics e = do
     -- perform well-formedness checking first
     maybe (return ()) (throwError . NotWellFormed) (wellFormed e)
-#ifdef SHARING_EARLY
-    expand [] e >>= variants
-#else
     vs <- variants e
-    es <- mapM (expand []) (map snd vs)
+    es <- mapM (letExp []) (map snd vs)
     return $ zip (map fst vs) es
-#endif
