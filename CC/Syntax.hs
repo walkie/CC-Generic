@@ -11,7 +11,7 @@
 module CC.Syntax where 
 
 import Control.Monad (liftM,liftM2)
-import Data.Generics
+import Data.Generics hiding (empty)
 import Data.Set (Set,empty,unions)
 
 
